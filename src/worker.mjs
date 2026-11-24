@@ -59,6 +59,13 @@ export default function activate(orca, requestOptions) {
     try { return { ok: true, value: await handler(input, context) }; }
     catch (error) { return { ok: false, code: error instanceof TrackerError ? error.code : 'host' }; }
   });
+  let credentialWriteActive = false;
+  async function writeCredential(run) {
+    if (credentialWriteActive) fail('busy');
+    credentialWriteActive = true;
+    try { return await run(); }
+    finally { credentialWriteActive = false; }
+  }
 
   async function base(expected) {
     const value = normalizeBase(await orca.settings.get(URL_SETTING));
@@ -90,19 +97,20 @@ export default function activate(orca, requestOptions) {
     return { token: digest([url, id, hostId, repo]), key: `mapping-${digest([url, hostId, repo])}`, name: project || 'this Orca project' };
   }
 
-  register('connection.save', async (input) => {
+  register('connection.save', (input) => writeCredential(async () => {
     const url = await base(input?.base);
     if (!validKey(input?.key)) fail('invalid_key');
     try { await orca.secrets.set(SECRET, JSON.stringify({ url, key: input.key })); }
     catch { fail('secret_unavailable'); }
     return null;
-  });
+  }));
 
-  register('connection.clear', async (input) => {
-    await base(input?.base);
+  register('connection.clear', (input) => writeCredential(async () => {
+    const url = normalizeBase(await orca.settings.get(URL_SETTING));
+    if (url !== input?.base) fail('url_changed');
     try { await orca.secrets.delete(SECRET); } catch { fail('secret_unavailable'); }
     return null;
-  });
+  }));
 
   register('sidebar.challenge', (_, { panel, signal }) => {
     if (panel?.surface !== 'panel' || !panel.id || signal?.aborted) fail('cancelled');

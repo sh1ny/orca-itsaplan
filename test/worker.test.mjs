@@ -173,6 +173,33 @@ test('synthetic dev caller cannot start a read without a live-frame witness', as
   assert.deepEqual(h.calls, []);
 });
 
+test('loads distinct boards for the same project key in two teams', async () => {
+  const h = harness((url) => {
+    if (url.endsWith('/projects')) return json([project(8, 'alpha.ENG'), project(9, 'beta.ENG')]);
+    const id = url.includes('/10.ENG') ? 8 : 9;
+    return boardResponses(url, [issue(id, 1)], scaffold(id, false));
+  });
+  const { value: { projects } } = await h.run('projects.list');
+  for (const entry of projects) {
+    const { value } = await h.board(entry);
+    assert.equal(value.groups[0].issues[0].identifier, `ENG-${entry.id}`);
+  }
+  assert.deepEqual(h.calls, [
+    `${base}/projects`, `${base}/projects/10.ENG/issues?limit=200`, `${base}/projects/10.ENG`,
+    `${base}/projects/11.ENG/issues?limit=200`, `${base}/projects/11.ENG`,
+  ]);
+});
+
+test('an invalid URL does not prevent clearing a stored key', async () => {
+  const h = harness(() => assert.fail('cleared key reached transport'));
+  h.setUrl('');
+  assert.equal((await h.run('connection.clear')).code, 'url_changed');
+  assert.equal((await h.run('connection.clear', { base: null })).ok, true);
+  h.setUrl(base);
+  assert.equal((await h.run('projects.list')).code, 'missing_key');
+  assert.deepEqual(h.calls, []);
+});
+
 test('projects only bounded board data and counts listed children', async () => {
   const rows = [issue(6, 2, 4), issue(5, 1, 4), { ...issue(4, 1), description: key }];
   const h = harness((url) => boardResponses(url, rows));

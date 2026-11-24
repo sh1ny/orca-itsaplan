@@ -12,8 +12,9 @@ const select = find('project');
 const remember = find('remember');
 const board = find('board');
 const messages = {
-  loading: 'Loading…', busy: 'Another panel is reading. Try Refresh.',
+  loading: 'Loading…', busy: 'Another panel request is in progress. Try again.',
   cancelled: 'Read cancelled. Try Refresh.', host: 'Orca could not complete the request. Try Refresh.',
+  frame_required: 'Could not connect to the sidebar session. Reopen the sidebar and try again.',
   invalid_url: 'Set the HTTPS API URL in Settings → Plugins → It’s a Plan.',
   url_changed: 'The API URL changed. Refresh and enter the key for the displayed address.',
   missing_key: 'Enter an API key for this address in Connection.',
@@ -31,6 +32,8 @@ const messages = {
   invalid_project: 'This project is no longer selectable. Refresh the project list.',
   focus_changed: 'The focused Orca project changed. Try again in the correct workspace.',
 };
+
+const messageFor = (status) => status ? (messages[status] ?? messages.host) : '';
 
 function message(node, text) {
   node.textContent = text;
@@ -96,13 +99,13 @@ const panel = createPanel({
       if (state.catalog && ['missing_key', 'unauthorized'].includes(shownStatus)) credentials.open = false;
       shownStatus = state.catalogStatus;
     }
-    message(connectionStatus, state.catalogStatus ? messages[state.catalogStatus]
+    message(connectionStatus, state.catalogStatus ? messageFor(state.catalogStatus)
       : !state.catalog?.projects.length ? 'No accessible projects.' : '');
-    message(find('action-status'), messages[state.actionStatus]);
+    message(find('action-status'), messageFor(state.actionStatus));
     message(find('base'), state.base ?? messages.invalid_url);
     key.disabled = !state.base || state.saving;
     find('save').disabled = key.disabled;
-    find('clear').disabled = key.disabled;
+    find('clear').disabled = state.saving || state.catalogStatus === 'loading';
     refresh.disabled = state.catalogStatus === 'loading' || state.saving;
     picker.hidden = !state.catalog?.projects.length;
     find('catalog-note').hidden = !state.catalog?.partial;
@@ -118,7 +121,7 @@ const panel = createPanel({
       : state.focus ? `Focused: ${state.focus.name}.` : 'Choose a project manually when no Orca repository is available.');
     remember.hidden = !state.focus || !state.selected || mapped;
     remember.disabled = state.mapping;
-    message(find('board-status'), state.boardStatus === 'loading' ? 'Loading board…' : messages[state.boardStatus]);
+    message(find('board-status'), state.boardStatus === 'loading' ? 'Loading board…' : messageFor(state.boardStatus));
     if (shownBoard !== state.board) { shownBoard = state.board; renderBoard(state.board); }
   },
 });

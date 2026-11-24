@@ -195,3 +195,23 @@ test('manual selection wins a pending focus lookup', async () => {
   assert.equal(h.state.board, 'Manual board');
   assert.equal(h.calls.length, 3);
 });
+
+test('refresh preserves a manual selection in the same focused workspace', async () => {
+  const h = harness();
+  const { open, focus, list } = await start(h);
+  focus.finish(mapped(1));
+  list.finish(catalog());
+  (await h.next('board.read')).finish(ok('Mapped board'));
+  await open;
+  const choosing = h.panel.pick(2);
+  (await h.next('board.read')).finish(ok('Manual board'));
+  await choosing;
+
+  const refreshing = h.panel.refresh();
+  (await h.next('focus.read')).finish(mapped(1));
+  (await h.next('projects.list')).finish(catalog());
+  const request = await h.next('board.read');
+  request.finish(ok('Refreshed board'));
+  await refreshing;
+  assert.equal(request.input.project.id, 2);
+});

@@ -10,6 +10,7 @@ export function createPanel({ readSetting, request, render, clearDraft }) {
   let focusGeneration = 0;
   let manualGeneration = 0;
   let fallback = null;
+  let preservedFocus;
   let focusPending = false;
   let observedId;
   let catalogRequest;
@@ -47,8 +48,11 @@ export function createPanel({ readSetting, request, render, clearDraft }) {
   function reconcile() {
     if (state.catalog && !focusPending) {
       const mapped = state.focus?.mappedId;
+      const sameFocus = preservedFocus === (state.focus?.token ?? null);
+      const useFallback = sameFocus && state.catalog.projects.some(({ id }) => id === fallback);
+      preservedFocus = undefined;
       const hasMapping = state.catalog.projects.some(({ id }) => id === mapped);
-      void board(hasMapping ? mapped : fallback);
+      void board(useFallback || !hasMapping ? fallback : mapped);
     }
   }
 
@@ -82,6 +86,7 @@ export function createPanel({ readSetting, request, render, clearDraft }) {
     focusPending = false;
     clearBoard();
     const oldBase = state.base;
+    preservedFocus = !reset && state.selected !== null ? (state.focus?.token ?? null) : undefined;
     fallback = reset ? null : (state.selected ?? fallback);
     Object.assign(state, {
       base: null, catalog: null, selected: null, focus: null, catalogStatus: 'loading',
@@ -109,7 +114,7 @@ export function createPanel({ readSetting, request, render, clearDraft }) {
   }
 
   async function credential(method, key) {
-    if (disposed || !state.base || state.saving) return;
+    if (disposed || state.saving || (method === 'connection.save' && !state.base)) return;
     const generation = connectionGeneration;
     const input = { base: state.base };
     if (method === 'connection.save') input.key = key;
