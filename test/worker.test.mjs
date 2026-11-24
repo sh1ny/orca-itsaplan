@@ -5,8 +5,8 @@ import activate from '../src/worker.mjs';
 const base = 'https://plan.example.test/prefix';
 const other = 'https://other.example.test';
 const key = 'test-opaque-credential';
-const selected = { id: 8, ref: 'alpha.ENG' };
-const project = (id, ref) => ({ id, ref, teamName: ref.split('.')[0], name: 'Engineering' });
+const selected = { id: 8, teamId: 10, ref: 'alpha.ENG' };
+const project = (id, ref) => ({ id, teamId: id + 2, ref, teamName: ref.split('.')[0], name: 'Engineering' });
 const column = (id, name, position, stateType) => ({ id, name, position, stateType });
 const issue = (id, columnId, parentId = null) => ({ id, columnId, parentId, title: `Work ${id}`, identifier: `ENG-${id}`, position: id });
 const initiative = { projectId: 8, title: 'Ship', status: 'active', progress: { completed: 2, total: 5 } };
@@ -22,6 +22,7 @@ function harness(fetch, configure = {}) {
   let focusId = 'local-test';
   const stored = new Map();
   const handlers = new Map();
+  const witnesses = new Map();
   const calls = [];
   activate({
     settings: { get: async () => url },
@@ -32,18 +33,29 @@ function harness(fetch, configure = {}) {
     },
     storage: { get: async (k) => stored.get(k), set: async (k, v) => stored.set(k, v) },
     host: { call: async (method) => method === 'workspace.readContext' ? { workspaceId: focusId } : { workspaces } },
-    panels: { handle: (name, handler) => handlers.set(name, handler) },
+    panels: {
+      handle: (name, handler) => handlers.set(name, handler),
+      post: (name, { witness }, { panel }) => {
+        if (name === 'sidebar.witness' && !panel.startsWith('orca-cli')) witnesses.set(panel, witness);
+      },
+    },
   }, { deadline: configure.deadline, fetch: (uri, options) => { calls.push(uri); return fetch(uri, options); } });
+  const request = (name, data, panel, signal) => handlers.get(name)(
+    { base, ...data }, { panel: panel && { id: panel, surface: 'panel' }, signal },
+  );
+  function run(name, data = {}, panel = 'a', signal = new AbortController().signal) {
+    if (panel && (name === 'projects.list' || name === 'board.read') && !witnesses.has(panel)) {
+      void request('sidebar.challenge', {}, panel, signal);
+    }
+    return request(name, { witness: witnesses.get(panel), ...data }, panel, signal);
+  }
   return {
     calls,
     setUrl: (value) => { url = value; },
     workspace: (id, rows) => { focusId = id; workspaces = rows; },
-    run: (name, data = {}, panel = 'a', signal = new AbortController().signal) => handlers.get(name)(
-      { base, ...data }, { panel: panel && { id: panel, surface: 'panel' }, signal },
-    ),
-    board: (data = selected, panel, signal) => handlers.get('board.read')(
-      { base, project: data }, { panel: { id: panel ?? 'a', surface: 'panel' }, signal: signal ?? new AbortController().signal },
-    ),
+    run,
+    request: (name, data, panel) => request(name, data, panel, new AbortController().signal),
+    board: (data = selected, panel, signal) => run('board.read', { project: { teamId: data.id + 2, ...data } }, panel, signal),
   };
 }
 
@@ -110,7 +122,7 @@ test('coalesces superseded selections', async () => {
   const first = Promise.withResolvers();
   const started = Promise.withResolvers();
   const h = harness((url) => {
-    if (url.includes('alpha.ENG')) { started.resolve(); return first.promise; }
+    if (url.includes('/10.ENG/')) { started.resolve(); return first.promise; }
     return url.includes('/issues?') ? json([]) : json(scaffold(10, false));
   });
   const a = h.board();
@@ -122,7 +134,7 @@ test('coalesces superseded selections', async () => {
   first.resolve(json([]));
   assert.equal((await a).code, 'cancelled');
   assert.equal((await c).ok, true);
-  assert.ok(h.calls.every((url) => !url.includes('beta.ENG')));
+  assert.ok(h.calls.every((url) => !url.includes('/11.ENG')));
 });
 
 test("preserves another panel's request", async () => {
@@ -144,13 +156,21 @@ test("preserves another panel's request", async () => {
 });
 
 test('preserves qualified projects from different teams', async () => {
-  const h = harness(() => json([project(8, 'alpha.ENG'), { ...project(9, 'beta.ENG'), name: key }]));
+  const h = harness(() => json([project(8, 'alpha.ENG'), { ...project(9, 'beta.7XTR'), name: key }]));
   assert.deepEqual((await h.run('projects.list')).value, { projects: [
-    { id: 8, team: 'alpha', name: 'Engineering', ref: 'alpha.ENG' },
-    { id: 9, team: 'beta', name: '[redacted]', ref: 'beta.ENG' },
+    { id: 8, teamId: 10, team: 'alpha', name: 'Engineering', ref: 'alpha.ENG' },
+    { id: 9, teamId: 11, team: 'beta', name: '[redacted]', ref: 'beta.7XTR' },
   ], partial: false });
   assert.equal((await h.run('projects.list', {}, null)).code, 'cancelled');
   assert.equal(h.calls.length, 1);
+});
+
+test('synthetic dev caller cannot start a read without a live-frame witness', async () => {
+  const h = harness(() => assert.fail('detached caller reached transport'));
+  assert.deepEqual(await h.request('sidebar.challenge', {}, 'orca-cli'), { ok: true, value: null });
+  assert.equal((await h.request('projects.list', {}, 'orca-cli')).code, 'frame_required');
+  assert.equal((await h.request('board.read', { project: selected }, 'a')).code, 'frame_required');
+  assert.deepEqual(h.calls, []);
 });
 
 test('projects only bounded board data and counts listed children', async () => {
@@ -202,7 +222,7 @@ test('reports partial board and catalog results', async () => {
 test('rejects replacement scaffold after issue read', async () => {
   const h = harness((url) => boardResponses(url, [issue(4, 1)], scaffold(9)));
   assert.deepEqual(await h.board(), { ok: false, code: 'project_changed' });
-  assert.deepEqual(h.calls, [`${base}/projects/alpha.ENG/issues?limit=200`, `${base}/projects/alpha.ENG`]);
+  assert.deepEqual(h.calls, [`${base}/projects/10.ENG/issues?limit=200`, `${base}/projects/10.ENG`]);
 });
 
 test('ambiguous or absent workspace metadata falls back to manual', async () => {
@@ -221,4 +241,6 @@ test('ambiguous or absent workspace metadata falls back to manual', async () => 
   assert.equal((await h.run('focus.save', { token: value.token, projectId: 8 })).ok, true);
   h.workspace('identity:child', [{ ...row, id: 'identity:child' }]);
   assert.equal((await h.run('focus.read')).value.mappedId, 8);
+  h.workspace('identity:two', [{ ...row, id: 'identity:two', hostId: 'local' }]);
+  assert.equal((await h.run('focus.read')).value.mappedId, null);
 });

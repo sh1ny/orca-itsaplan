@@ -12,4 +12,4 @@ export function normalizeBase(value) {
 }
 
 export const projectId = (id) => Number.isSafeInteger(id) && id > 0;
-export const projectRef = (ref) => typeof ref === 'string' && /^[A-Za-z0-9_-]{1,128}\.[A-Z][A-Z0-9]{0,9}$/.test(ref);
+export const projectRef = (ref) => typeof ref === 'string' && /^[A-Za-z0-9_-]{1,128}\.[A-Za-z0-9_-]{1,128}$/.test(ref);

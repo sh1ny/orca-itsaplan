@@ -1,4 +1,5 @@
 import { URL_SETTING } from './connection.mjs';
+import { connectFrame } from './frame-bridge.mjs';
 import { createPanel } from './panel-state.mjs';
 
 const find = (id) => document.getElementById(id);
@@ -84,9 +85,10 @@ let shownCatalog;
 let shownBoard;
 let shownStatus;
 const host = globalThis.orca;
+const frame = connectFrame(host.plugin);
 const panel = createPanel({
   readSetting: () => host.settings.get(URL_SETTING),
-  request: (...args) => host.plugin.request(...args),
+  request: frame.request,
   clearDraft: () => { key.value = ''; },
   render(state) {
     if (state.catalogStatus !== shownStatus) {
@@ -128,5 +130,5 @@ select.addEventListener('change', () => { void panel.pick(Number(select.value) |
 remember.addEventListener('click', () => { void panel.remember(); });
 const workspace = host.on('workspace.changed', (event) => { void panel.workspaceChanged(event); });
 const settings = host.settings.onDidChange(({ key: changed }) => { if (changed === URL_SETTING) void panel.urlChanged(); });
-window.addEventListener('pagehide', () => { workspace.dispose(); settings.dispose(); panel.close(); }, { once: true });
+window.addEventListener('pagehide', () => { workspace.dispose(); settings.dispose(); panel.close(); frame.close(); }, { once: true });
 void panel.open();

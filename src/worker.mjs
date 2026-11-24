@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { normalizeBase, projectId, URL_SETTING } from './connection.mjs';
 import { tracker, TrackerError } from './tracker.mjs';
 
@@ -49,6 +49,12 @@ function readLane() {
 
 export default function activate(orca, requestOptions) {
   const read = readLane();
+  const witnessKey = randomBytes(32);
+  const witnessFor = (panel) => createHmac('sha256', witnessKey).update(panel.id).digest('hex');
+  function requireFrame(input, { panel, signal }) {
+    if (panel?.surface !== 'panel' || !panel.id || !signal || signal.aborted) fail('cancelled');
+    if (input?.witness !== witnessFor(panel)) fail('frame_required');
+  }
   const register = (name, handler) => orca.panels.handle(name, async (input, context) => {
     try { return { ok: true, value: await handler(input, context) }; }
     catch (error) { return { ok: false, code: error instanceof TrackerError ? error.code : 'host' }; }
@@ -98,10 +104,21 @@ export default function activate(orca, requestOptions) {
     return null;
   });
 
-  register('projects.list', (input, context) => read('projects', context, async (signal) =>
-    (await pairedTracker(input?.base)).projects(signal)));
-  register('board.read', (input, context) => read('board', context, async (signal) =>
-    (await pairedTracker(input?.base)).board(input?.project ?? {}, signal)));
+  register('sidebar.challenge', (_, { panel, signal }) => {
+    if (panel?.surface !== 'panel' || !panel.id || signal?.aborted) fail('cancelled');
+    // Direct dev requests can claim a panel id, but only an attached frame gets this push.
+    orca.panels.post('sidebar.witness', { witness: witnessFor(panel) }, { panel: panel.id });
+    return null;
+  });
+
+  register('projects.list', (input, context) => {
+    requireFrame(input, context);
+    return read('projects', context, async (signal) => (await pairedTracker(input.base)).projects(signal));
+  });
+  register('board.read', (input, context) => {
+    requireFrame(input, context);
+    return read('board', context, async (signal) => (await pairedTracker(input.base)).board(input.project ?? {}, signal));
+  });
 
   register('focus.read', async (input) => {
     const match = await scope(await base(input?.base));

@@ -15,6 +15,7 @@ function harness(url = base) {
   const waiters = [];
   let state;
   let draftClears = 0;
+  let draft = '';
   const panel = createPanel({
     readSetting: async () => url,
     request(name, input, { signal }) {
@@ -26,12 +27,14 @@ function harness(url = base) {
       return d.promise;
     },
     render: (value) => { state = { ...value }; },
-    clearDraft: () => { draftClears++; },
+    clearDraft: () => { draft = ''; draftClears++; },
   });
   return {
     panel, calls, setUrl: (next) => { url = next; },
     get state() { return state; },
     get draftClears() { return draftClears; },
+    setDraft(value) { draft = value; },
+    get draft() { return draft; },
     async next(name) {
       const call = queue.shift() ?? await new Promise((resolve) => waiters.push(resolve));
       assert.equal(call.name, name);
@@ -89,6 +92,24 @@ test('a URL change invalidates a save completion and clears old data', async () 
   changedList.finish({ ok: false, code: 'missing_key' });
   await changed;
   assert.equal(h.state.catalogStatus, 'missing_key');
+});
+
+test('editing the URL clears an unsent key before showing the new base', async () => {
+  const h = harness();
+  const { open, focus, list } = await start(h);
+  focus.finish(ok(null));
+  list.finish({ ok: false, code: 'missing_key' });
+  await open;
+  h.setDraft('test-key-for-old-address');
+  h.setUrl('https://other.example.test');
+  const changed = h.panel.urlChanged();
+  assert.equal(h.draft, '');
+  (await h.next('focus.read')).finish(ok(null));
+  (await h.next('projects.list')).finish({ ok: false, code: 'missing_key' });
+  await changed;
+  assert.equal(h.state.base, 'https://other.example.test');
+  assert.equal(h.draft, '');
+  assert.ok(h.calls.every(({ name }) => name !== 'connection.save'));
 });
 
 test('closed panel cannot start tracker reads', async () => {

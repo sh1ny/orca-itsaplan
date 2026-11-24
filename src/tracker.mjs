@@ -77,15 +77,18 @@ export function tracker(base, key, { fetch: request = globalThis.fetch, deadline
       requireShape(Array.isArray(rows));
       const projects = [];
       for (const row of rows.slice(0, MAX_PROJECTS)) {
-        requireShape(projectId(row?.id) && projectRef(row.ref));
-        if (!row.ref.includes(key)) projects.push({ id: row.id, ref: row.ref, team: text(row.teamName), name: text(row.name) });
+        requireShape(projectId(row?.id) && projectId(row.teamId) && projectRef(row.ref));
+        if (!row.ref.includes(key)) projects.push({
+          id: row.id, teamId: row.teamId, ref: row.ref, team: text(row.teamName), name: text(row.name),
+        });
       }
       return { projects, partial: rows.length >= MAX_PROJECTS };
     },
 
-    async board({ id, ref }, signal) {
-      if (!projectId(id) || !projectRef(ref) || ref.includes(key)) throw new TrackerError('invalid_project');
-      const route = `/projects/${encodeURIComponent(ref)}`;
+    async board({ id, teamId, ref }, signal) {
+      if (!projectId(id) || !projectId(teamId) || !projectRef(ref) || ref.includes(key)) throw new TrackerError('invalid_project');
+      // A mutable team slug is for display; the API also resolves refs by numeric team id.
+      const route = `/projects/${teamId}${ref.slice(ref.indexOf('.'))}`;
       const rows = await get(`${route}/issues?limit=${MAX_ISSUES}`, signal);
       requireShape(Array.isArray(rows));
       const scaffold = await get(route, signal);
