@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomBytes } from 'node:crypto';
-import { normalizeBase, projectId, URL_SETTING } from './connection.mjs';
+import { normalizeBase, URL_SETTING } from './connection.mjs';
 import { tracker, TrackerError } from './tracker.mjs';
 
 const SECRET = 'connection';
@@ -86,16 +86,16 @@ export default function activate(orca, requestOptions) {
     return tracker(url, saved.key, requestOptions);
   }
 
-  async function scope(url) {
+  register('focus.read', async () => {
     const context = await orca.host.call('workspace.readContext');
-    if (!context?.workspaceId) return null;
-    const { workspaces } = await orca.host.call('workspace.list');
-    const rows = workspaces.filter(({ id }) => id === context.workspaceId);
-    if (rows.length !== 1) return null;
-    const { id, hostId, projectId: repo, kind, project } = rows[0];
-    if (kind !== 'worktree' || !hostId?.trim() || !repo?.trim()) return null;
-    return { token: digest([url, id, hostId, repo]), key: `mapping-${digest([url, hostId, repo])}`, name: project || 'this Orca project' };
-  }
+    if (!context) return null;
+    const id = context.workspaceId;
+    return {
+      name: context.displayName,
+      token: id ? digest(id) : null,
+      eventId: id && /^(identity|folder):/.test(id) ? id : null,
+    };
+  });
 
   register('connection.save', (input) => writeCredential(async () => {
     const url = await base(input?.base);
@@ -128,20 +128,4 @@ export default function activate(orca, requestOptions) {
     return read('board', context, async (signal) => (await pairedTracker(input.base)).board(input.project ?? {}, signal));
   });
 
-  register('focus.read', async (input) => {
-    const match = await scope(await base(input?.base));
-    if (!match) return null;
-    const saved = await orca.storage.get(match.key);
-    return { token: match.token, name: match.name, mappedId: projectId(saved) ? saved : null };
-  });
-
-  register('focus.save', async (input) => {
-    if (!projectId(input?.projectId)) fail('invalid_project');
-    const url = await base(input?.base);
-    const match = await scope(url);
-    if (!match || match.token !== input.token) fail('focus_changed');
-    await base(url);
-    await orca.storage.set(match.key, input.projectId);
-    return null;
-  });
 }

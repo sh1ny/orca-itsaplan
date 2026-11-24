@@ -16,12 +16,12 @@
 | Project board summary | Grouped board with subtasks | test/worker.test.mjs | projects only bounded board data and counts listed children | green |
 | Project board summary | Unavailable initiatives and missing column | test/worker.test.mjs | optional initiatives do not hide unknown-column issues | green |
 | Project board summary | Partial board | test/worker.test.mjs | reports partial board and catalog results | green |
-| Follow a focused workspace | Switch between mapped projects | test/panel.test.mjs | mapped focus supersedes stale board replies; returning to a mapped workspace during refresh drops the manual override | green |
-| Follow a focused workspace | Focus and project list resolve in either order | test/panel.test.mjs | focus and project list complete in either order | green |
-| Follow a focused workspace | Reused tracker route | test/panel.test.mjs | a replacement project does not inherit a mapping | green |
+| Follow a focused workspace | Switch workspace and return | test/panel.test.mjs | switching workspaces clears the choice and does not remember it on return | green |
+| Follow a focused workspace | Refresh the displayed view | test/panel.test.mjs | refresh reloads the displayed board without reloading the picker; no workspace identity still permits manual selection and catalog refresh | green |
+| Follow a focused workspace | Focus changes before its event arrives | test/panel.test.mjs | refresh does not reload the old board if the worker sees focus move first | green |
+| Follow a focused workspace | Workspace event without a public identifier | test/panel.test.mjs; test/worker.test.mjs | an ID-less event rechecks focus without discarding a choice in the same workspace; projects raw workspace identities as distinct opaque focus tokens | green |
 | Follow a focused workspace | Tracker route reused during a board load | test/worker.test.mjs | rejects replacement scaffold after issue read | green |
-| Follow a focused workspace | Manual choice during focus lookup | test/panel.test.mjs | manual selection wins a pending focus lookup; refresh retains a manual choice made before focus first resolves | green |
-| Follow a focused workspace | No reliable repository identity | test/worker.test.mjs | ambiguous or absent workspace metadata falls back to manual | green |
+| Follow a focused workspace | No reliable workspace identity | test/panel.test.mjs | no workspace identity still permits manual selection and catalog refresh | green |
 
 ## 1. Read-only sidebar
 

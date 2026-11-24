@@ -5,16 +5,16 @@ A read-only sidebar for self-hosted [It's a Plan](https://github.com/croffasia/i
 ## Install and connect
 
 1. In Orca Desktop **1.4.273 or newer**, add this repository in **Settings → Plugins**, or load a local checkout with `orca plugin dev load .`.
-2. Review the approval prompt. The trusted Node worker runs on the Orca host; the plugin requests its own settings, encrypted secrets and mapping storage, plus read access to Orca workspace metadata. Only the worker makes tracker requests.
+2. Review the approval prompt. The trusted Node worker runs on the Orca host; the plugin requests its own settings and encrypted secrets, plus read access to Orca workspace metadata. Only the worker makes tracker requests.
 3. In the plugin’s settings, enter the **Itsaplan HTTPS API URL**, including a reverse-proxy path if needed, for example `https://tracker.example.org/api`. The Orca host must reach that address and trust its TLS certificate. Redirects are not followed.
 4. Open **It's a Plan** in the right sidebar, expand **Connection**, check the displayed API address, and enter a key authorized to read your projects. The field is cleared on submission; the plugin never fills it with a saved key. **Clear key** removes it. A URL change requires a key saved for the new address.
-5. Choose a project. For a focused Git workspace with a resolvable identity, **Remember for this Orca project** uses that preference in its other worktrees. Manual choice remains available when no mapping applies. **Refresh** reloads the current snapshot.
+5. Choose a project. The sidebar shows the focused Orca workspace and clears the choice when you switch workspaces. No choice is remembered on return. **Refresh** reloads the displayed board; clear the choice to refresh the project picker instead.
 
 ## Spike limits
 
 - One API base per installation; project access and key scopes are enforced by the tracker.
 - Up to 500 accessible projects, 200 recent issues, and the first 100 active initiatives for the selected project. The pane marks partial results. Subtask counts are derived from the listed children; checklist totals require extra per-issue requests and are not shown.
-- The worker can join focused workspace context to Orca’s Git project id and host id. The plugin host does not expose a Git remote URL. Without a unique Git project/host match, including some remote or folder contexts, use the manual picker. No repository-name guessing or native Orca Tasks integration.
+- The plugin follows workspace identity when Orca exposes it, without using repository names or paths to guess the tracker project. When a workspace has no identifiable focus, the picker still works manually. The plugin does not integrate with native Orca Tasks.
 
 ## Development
 

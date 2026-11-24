@@ -14,7 +14,7 @@ People working in Orca currently have to switch to their tracker to see the proj
 ## What Changes
 
 - Prove HTTPS access in an approved Orca trusted worker using its real secret store, then show a sidebar with project selection, active initiatives and issues grouped by board column.
-- Let users pick any visible project and optionally remember the choice for the focused Orca Git project. Determine what identity data Orca exposes for local, WSL and SSH workspaces.
+- Let users pick any accessible project. The sidebar follows workspace focus and clears the manual choice on a switch, without remembering choices per workspace. Determine what identity data Orca exposes for local, WSL and SSH workspaces.
 - Show progress inferred from listed subtasks, with no extra request per issue. Report which claims the live spike verified, and which environments it could not observe.
 - Scope: one instance per plugin installation and no Itsaplan writes, background polling, tracker-specific presets, worktree creation or native Orca Tasks integration.
 
@@ -22,7 +22,7 @@ People working in Orca currently have to switch to their tracker to see the proj
 
 ### New Capabilities
 
-- `itsaplan-sidebar`: Read-only project boards with encrypted connection credentials and an optional focused-workspace project mapping.
+- `itsaplan-sidebar`: Read-only project boards with encrypted connection credentials and a manual selection scoped to current Orca focus.
 
 ### Modified Capabilities
 
@@ -43,4 +43,12 @@ DECISION_MAKING: important
 - **Rejected:** Reimplement the full Orca task-provider proposal before proving the plugin interface.
 - **Reversal cost:** Low; a later integration can use a different surface.
 - **Important:** Yes; review and permission limits are part of the spike.
+- **Chosen by:** User.
+
+### S2: No remembered workspace selection
+
+- **Choice:** Follow Orca focus; a hand-picked tracker project lasts only for the current focus. Refresh reloads the board or picker already shown.
+- **Rejected:** Per-workspace preferences and automatic project restoration across switches.
+- **Reversal cost:** Low; no mapping data is stored.
+- **Important:** Yes; this replaces the initial mapping scope after pre-ship review.
 - **Chosen by:** User.

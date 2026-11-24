@@ -3,15 +3,11 @@ import { normalizeBase } from './connection.mjs';
 export function createPanel({ readSetting, request, render, clearDraft }) {
   const state = {
     base: null, catalog: null, focus: null, selected: null, board: null,
-    catalogStatus: 'loading', boardStatus: null, actionStatus: null, saving: false, mapping: false,
+    catalogStatus: 'loading', boardStatus: null, actionStatus: null, saving: false, checkingFocus: false,
   };
   let disposed = false;
   let connectionGeneration = 0;
-  let focusGeneration = 0;
-  let manualGeneration = 0;
-  let fallback = null;
-  let preserveSelection = false;
-  let focusPending = false;
+  let focusRead;
   let observedId;
   let catalogRequest;
   let boardRequest;
@@ -45,52 +41,56 @@ export function createPanel({ readSetting, request, render, clearDraft }) {
     draw();
   }
 
-  function reconcile() {
-    if (state.catalog && !focusPending) {
-      const mapped = state.focus?.mappedId;
-      const keepSelection = preserveSelection && state.catalog.projects.some(({ id }) => id === fallback);
-      preserveSelection = false;
-      const hasMapping = state.catalog.projects.some(({ id }) => id === mapped);
-      void board(keepSelection || !hasMapping ? fallback : mapped);
-    }
-  }
-
-  async function focus() {
-    if (disposed || !state.base) return;
-    const current = ++focusGeneration;
-    const manualAtStart = manualGeneration;
-    const connection = connectionGeneration;
-    fallback = state.selected ?? fallback;
-    state.focus = null;
-    state.mapping = false;
+  function clearSelection() {
     state.selected = null;
-    focusPending = true;
     clearBoard();
-    draw();
-    const result = await call('focus.read', { base: state.base });
-    if (disposed || current !== focusGeneration || connection !== connectionGeneration) return;
-    focusPending = false;
-    state.focus = result.ok ? result.value : null;
-    if (manualAtStart === manualGeneration) reconcile();
-    draw();
   }
 
-  async function refresh(reset = false) {
+  function followFocus() {
+    if (disposed) return;
+    state.checkingFocus = true;
+    const read = (async () => {
+      const result = await call('focus.read', null, { timeoutMs: 5_000 });
+      if (disposed || focusRead !== read) return;
+      state.checkingFocus = false;
+      if (result.ok) {
+        const next = result.value;
+        if ((state.focus?.token ?? null) !== (next?.token ?? null)) clearSelection();
+        state.focus = next;
+        observedId = next?.eventId ?? null;
+      }
+      draw();
+    })();
+    focusRead = read;
+    draw();
+    return read;
+  }
+
+  async function refresh() {
+    if (disposed || state.saving || state.catalogStatus === 'loading') return;
+    const connection = connectionGeneration;
+    if (state.selected !== null) {
+      // Context may change before Orca delivers the debounced event.
+      let current = followFocus();
+      while (current) {
+        await current;
+        if (disposed || connection !== connectionGeneration) return;
+        if (current === focusRead) break;
+        current = focusRead;
+      }
+      if (state.selected !== null) return board(state.selected);
+    }
+    return loadCatalog();
+  }
+
+  async function loadCatalog() {
     if (disposed) return;
     const generation = ++connectionGeneration;
     const controller = new AbortController();
     catalogRequest?.abort();
     catalogRequest = controller;
-    ++focusGeneration;
-    focusPending = false;
-    clearBoard();
-    const oldBase = state.base;
-    preserveSelection = !reset && state.selected !== null;
-    fallback = reset ? null : (state.selected ?? fallback);
-    Object.assign(state, {
-      base: null, catalog: null, selected: null, focus: null, catalogStatus: 'loading',
-      actionStatus: null, saving: false, mapping: false,
-    });
+    clearSelection();
+    Object.assign(state, { base: null, catalog: null, catalogStatus: 'loading', actionStatus: null, saving: false });
     clearDraft();
     draw();
     let value;
@@ -101,17 +101,11 @@ export function createPanel({ readSetting, request, render, clearDraft }) {
     }
     if (generation !== connectionGeneration || disposed) return;
     state.base = normalizeBase(value);
-    if (oldBase !== state.base) {
-      preserveSelection = false;
-      fallback = null;
-    }
     if (!state.base) { state.catalogStatus = 'invalid_url'; draw(); return; }
-    void focus();
     const result = await call('projects.list', { base: state.base }, { signal: controller.signal });
     if (generation !== connectionGeneration || disposed) return;
     state.catalogStatus = result.ok ? null : result.code;
     state.catalog = result.ok ? result.value : null;
-    reconcile();
     draw();
   }
 
@@ -127,43 +121,31 @@ export function createPanel({ readSetting, request, render, clearDraft }) {
     const result = await call(method, input);
     if (generation !== connectionGeneration || disposed) return;
     state.saving = false;
-    if (result.ok) await refresh();
+    if (result.ok) await loadCatalog();
     else { state.actionStatus = result.code; draw(); }
   }
 
   return {
-    open: () => refresh(true),
-    refresh: () => refresh(),
-    urlChanged: () => refresh(true),
+    open() {
+      if (!focusRead) void followFocus();
+      return loadCatalog();
+    },
+    refresh,
+    urlChanged: loadCatalog,
     workspaceChanged({ context } = {}) {
+      if (disposed) return;
       const next = context?.workspaceId;
       if (next && next === observedId) return;
-      observedId = next;
-      preserveSelection = false;
-      return focus();
+      if ((next && observedId) || (context === null && state.focus?.token)) clearSelection();
+      if (next) observedId = next;
+      return followFocus();
     },
     pick(id) {
-      if (disposed || !state.catalog) return;
-      ++manualGeneration;
-      fallback = id;
+      if (disposed || !state.catalog || state.checkingFocus) return;
       return board(id);
     },
     saveKey: (key) => credential('connection.save', key),
     clearKey: () => credential('connection.clear'),
-    async remember() {
-      const { selected: projectId, focus: match, base } = state;
-      if (disposed || !projectId || !match || state.mapping) return;
-      const generation = focusGeneration;
-      state.mapping = true;
-      state.actionStatus = null;
-      draw();
-      const result = await call('focus.save', { base, token: match.token, projectId });
-      if (disposed || generation !== focusGeneration) return;
-      state.mapping = false;
-      if (result.ok) state.focus = { ...match, mappedId: projectId };
-      else state.actionStatus = result.code;
-      draw();
-    },
     close() {
       disposed = true;
       catalogRequest?.abort();

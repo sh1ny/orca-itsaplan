@@ -9,7 +9,6 @@ const credentials = find('credentials');
 const key = find('key');
 const picker = find('picker');
 const select = find('project');
-const remember = find('remember');
 const board = find('board');
 const messages = {
   loading: 'Loading…', busy: 'Another panel request is in progress. Try again.',
@@ -28,9 +27,8 @@ const messages = {
   timeout: 'Itsaplan did not respond in time. Try Refresh.',
   too_large: 'The tracker response exceeded this panel’s size limit.',
   invalid_response: 'Itsaplan sent a response this panel does not recognize.',
-  project_changed: 'This route now identifies a different project. Refresh the project list.',
-  invalid_project: 'This project is no longer selectable. Refresh the project list.',
-  focus_changed: 'The focused Orca project changed. Try again in the correct workspace.',
+  project_changed: 'This route now identifies a different project. Clear the selection and press Refresh.',
+  invalid_project: 'This project is no longer selectable. Clear the selection and press Refresh.',
 };
 
 const messageFor = (status) => status ? (messages[status] ?? messages.host) : '';
@@ -106,7 +104,7 @@ const panel = createPanel({
     key.disabled = !state.base || state.saving;
     find('save').disabled = key.disabled;
     find('clear').disabled = state.saving || state.catalogStatus === 'loading';
-    refresh.disabled = state.catalogStatus === 'loading' || state.saving;
+    refresh.disabled = state.catalogStatus === 'loading' || state.saving || state.checkingFocus;
     picker.hidden = !state.catalog?.projects.length;
     find('catalog-note').hidden = !state.catalog?.partial;
     if (shownCatalog !== state.catalog) {
@@ -116,11 +114,9 @@ const panel = createPanel({
       ) ?? []));
     }
     select.value = state.selected ?? '';
-    const mapped = state.focus?.mappedId === state.selected && state.selected !== null;
-    message(find('focus'), mapped ? `Following ${state.focus.name}.`
-      : state.focus ? `Focused: ${state.focus.name}.` : 'Choose a project manually when no Orca repository is available.');
-    remember.hidden = !state.focus || !state.selected || mapped;
-    remember.disabled = state.mapping;
+    select.disabled = state.checkingFocus;
+    message(find('focus'), state.focus?.name ? `Focused workspace: ${state.focus.name}.`
+      : 'No workspace identified. Choose a project manually.');
     message(find('board-status'), state.boardStatus === 'loading' ? 'Loading board…' : messageFor(state.boardStatus));
     if (shownBoard !== state.board) { shownBoard = state.board; renderBoard(state.board); }
   },
@@ -130,7 +126,6 @@ find('connect').addEventListener('submit', (event) => { event.preventDefault(); 
 find('clear').addEventListener('click', () => { void panel.clearKey(); });
 refresh.addEventListener('click', () => { void panel.refresh(); });
 select.addEventListener('change', () => { void panel.pick(Number(select.value) || null); });
-remember.addEventListener('click', () => { void panel.remember(); });
 const workspace = host.on('workspace.changed', (event) => { void panel.workspaceChanged(event); });
 const settings = host.settings.onDidChange(({ key: changed }) => { if (changed === URL_SETTING) void panel.urlChanged(); });
 window.addEventListener('pagehide', () => { workspace.dispose(); settings.dispose(); panel.close(); frame.close(); }, { once: true });

@@ -49,6 +49,16 @@ The three requested edits are in the design and delta spec. The owner authorized
 
 The owner authorized one additional pre-ship fix round for F10: invalidate the preserved manual choice on a real focus change, test both A→B→A during Refresh and Refresh before focus resolves without real-time waits, and rerun the OMP pre-ship review. Ship only if that review passes; no waiver or further round was authorized.
 
+## Owner scope decision (pre-ship cases F10–F12)
+
+The owner superseded the remembered-mapping scope: “the panel follows the focused workspace; a hand-picked project lasts only until the focused workspace changes. Nothing is remembered per workspace across switches, and Refresh reloads whatever is shown now.”
+
+- **F10 — resolved by scope change.** Returning to a workspace leaves the picker unselected; there is no remembered project or preserved override to restore.
+- **F11 — resolved by scope change.** Refresh checks current focus before reloading the current view. If focus already moved, the old selection is cleared instead of refreshed.
+- **F12 — resolved by scope change.** An event without a public workspace ID only triggers an identity check. The same resolved workspace remains selected.
+
+One OMP pre-ship review is authorized on the reduced scope. A blocker stops shipment; no waiver or additional round is authorized.
+
 
 <!-- specwright-design-progress -->
 <!-- eyJ2ZXJzaW9uIjoxLCJyb3VuZCI6Mywic2NvcGVfcm91bmQiOjMsImV4dGVuZGVkIjpmYWxzZSwibG9nIjpbeyJyb3VuZCI6MiwicmVwYWlycyI6IkJpbmQgZHJhZnQgY3JlZGVudGlhbHMgdG8gdmlzaWJsZSBiYXNlOyBpbnZhbGlkYXRlIHN0YWxlIGZvY3VzIGFuZCBzZXR0aW5ncyB3b3JrOyBib3VuZCBsaXZlIHJlYWRzOyBjbGFyaWZ5IGNvbnRyYWN0cyBhbmQgZXhjbHVzaW9ucyJ9LHsicm91bmQiOjMsInJlcGFpcnMiOiJNYWtlIHRoZSBsaXN0IGEgcHJlcmVxdWlzaXRlOyBpc29sYXRlIGxhbmUgb3duZXJzaGlwIGJ5IHNlc3Npb247IHBlcnNpc3QgdHJhY2tlciBpZHM7IHRpZ2h0ZW4gc2NlbmFyaW9zIGFuZCBob3N0IGNpdGF0aW9ucyJ9XX0= -->

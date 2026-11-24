@@ -18,9 +18,7 @@ const json = (value, status = 200) => new Response(JSON.stringify(value), { stat
 function harness(fetch, configure = {}) {
   let url = base;
   let secret = configure.secret === null ? null : JSON.stringify({ url, key });
-  let workspaces = [];
-  let focusId = 'local-test';
-  const stored = new Map();
+  let focused = null;
   const handlers = new Map();
   const witnesses = new Map();
   const calls = [];
@@ -31,8 +29,10 @@ function harness(fetch, configure = {}) {
       set: async (_, value) => { if (configure.beforeStore) await configure.beforeStore(); secret = value; },
       delete: async () => { secret = null; },
     },
-    storage: { get: async (k) => stored.get(k), set: async (k, v) => stored.set(k, v) },
-    host: { call: async (method) => method === 'workspace.readContext' ? { workspaceId: focusId } : { workspaces } },
+    host: { call: async (method) => {
+      assert.equal(method, 'workspace.readContext');
+      return focused;
+    } },
     panels: {
       handle: (name, handler) => handlers.set(name, handler),
       post: (name, { witness }, { panel }) => {
@@ -52,7 +52,7 @@ function harness(fetch, configure = {}) {
   return {
     calls,
     setUrl: (value) => { url = value; },
-    workspace: (id, rows) => { focusId = id; workspaces = rows; },
+    workspace: (value) => { focused = value; },
     run,
     request: (name, data, panel) => request(name, data, panel, new AbortController().signal),
     board: (data = selected, panel, signal) => run('board.read', { project: { teamId: data.id + 2, ...data } }, panel, signal),
@@ -252,22 +252,17 @@ test('rejects replacement scaffold after issue read', async () => {
   assert.deepEqual(h.calls, [`${base}/projects/10.ENG/issues?limit=200`, `${base}/projects/10.ENG`]);
 });
 
-test('ambiguous or absent workspace metadata falls back to manual', async () => {
-  const h = harness(() => assert.fail('focus must not start a GET'));
-  const row = { id: 'identity:one', hostId: 'ssh:host', projectId: 'repo', kind: 'worktree', project: 'Repo', path: '/private/path' };
-  for (const rows of [[], [row, row], [{ ...row, hostId: null }], [{ ...row, kind: 'folder' }]]) {
-    h.workspace(row.id, rows);
-    assert.deepEqual(await h.run('focus.read'), { ok: true, value: null });
-  }
-  h.workspace(row.id, [row]);
-  const { value } = await h.run('focus.read');
-  assert.deepEqual(Object.keys(value).sort(), ['mappedId', 'name', 'token']);
-  h.workspace('identity:two', [{ ...row, id: 'identity:two', hostId: 'local' }]);
-  assert.equal((await h.run('focus.save', { token: value.token, projectId: 8 })).code, 'focus_changed');
-  h.workspace(row.id, [row]);
-  assert.equal((await h.run('focus.save', { token: value.token, projectId: 8 })).ok, true);
-  h.workspace('identity:child', [{ ...row, id: 'identity:child' }]);
-  assert.equal((await h.run('focus.read')).value.mappedId, 8);
-  h.workspace('identity:two', [{ ...row, id: 'identity:two', hostId: 'local' }]);
-  assert.equal((await h.run('focus.read')).value.mappedId, null);
+test('projects raw workspace identities as distinct opaque focus tokens', async () => {
+  const h = harness(() => assert.fail('focus must not start a tracker GET'));
+  assert.deepEqual(await h.run('focus.read'), { ok: true, value: null });
+  h.workspace({ workspaceId: 'repo::/private/wsl/branch', displayName: 'Same name' });
+  const { value: first } = await h.run('focus.read');
+  h.workspace({ workspaceId: 'repo::/private/ssh/branch', displayName: 'Same name' });
+  const { value: second } = await h.run('focus.read');
+  assert.equal(first.name, second.name);
+  assert.equal(first.eventId, null);
+  assert.match(first.token, /^[0-9a-f]{64}$/);
+  assert.notEqual(first.token, second.token);
+  h.workspace({ workspaceId: 'identity:one', displayName: 'Named workspace' });
+  assert.equal((await h.run('focus.read')).value.eventId, 'identity:one');
 });

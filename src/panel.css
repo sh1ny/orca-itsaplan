@@ -19,7 +19,7 @@ button { cursor: pointer; }
 button:disabled { cursor: default; opacity: .55; }
 :focus-visible { outline: 2px solid var(--orca-ring); outline-offset: 2px; }
 details, .column { border: 1px solid var(--orca-border); border-radius: var(--orca-radius, 5px); padding: 8px; }
-details > p, form, .mapping > button, #board > section + section, .column { margin-top: 8px; }
+details > p, form, #board > section + section, .column { margin-top: 8px; }
 .column > h3, .issue > span { overflow-wrap: anywhere; }
 ul { padding: 0; list-style: none; }
 li { padding: 5px 0; }

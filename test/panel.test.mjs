@@ -5,7 +5,7 @@ import { createPanel } from '../src/panel-state.mjs';
 const base = 'https://plan.example.test';
 const projects = [{ id: 1, ref: 'team.ONE' }, { id: 2, ref: 'team.TWO' }];
 const ok = (value) => ({ ok: true, value });
-const mapped = (mappedId) => ok({ token: `test-${mappedId}`, name: 'Repository', mappedId });
+const focused = (token, eventId = `identity:${token}`) => ok({ token, eventId, name: `Workspace ${token}` });
 const catalog = (rows = projects) => ok({ projects: rows, partial: false });
 const change = (workspaceId) => ({ context: { workspaceId } });
 
@@ -63,7 +63,7 @@ test('key save recovers missing credentials', async () => {
   assert.equal(save.input.base, base);
   assert.ok(h.draftClears > count);
   save.finish(ok(null));
-  (await h.next('focus.read')).finish(ok(null));
+  assert.equal(h.calls.filter(({ name }) => name === 'focus.read').length, 1);
   (await h.next('projects.list')).finish(catalog());
   await saving;
   assert.deepEqual(h.state.catalog.projects, projects);
@@ -82,13 +82,11 @@ test('a URL change invalidates a save completion and clears old data', async () 
   const changed = h.panel.urlChanged();
   assert.equal(h.state.catalog, null);
   assert.equal(h.state.base, null);
-  const changedFocus = await h.next('focus.read');
   const changedList = await h.next('projects.list');
   assert.equal(changedList.input.base, 'https://other.example.test');
   oldSave.finish(ok(null));
   await saving;
   assert.equal(h.calls.filter(({ name }) => name === 'projects.list').length, 2);
-  changedFocus.finish(ok(null));
   changedList.finish({ ok: false, code: 'missing_key' });
   await changed;
   assert.equal(h.state.catalogStatus, 'missing_key');
@@ -104,7 +102,6 @@ test('editing the URL clears an unsent key before showing the new base', async (
   h.setUrl('https://other.example.test');
   const changed = h.panel.urlChanged();
   assert.equal(h.draft, '');
-  (await h.next('focus.read')).finish(ok(null));
   (await h.next('projects.list')).finish({ ok: false, code: 'missing_key' });
   await changed;
   assert.equal(h.state.base, 'https://other.example.test');
@@ -118,7 +115,7 @@ test('closed panel cannot start tracker reads', async () => {
   h.panel.close();
   assert.equal(list.signal.aborted, true);
   list.finish(catalog());
-  focus.finish(mapped(1));
+  focus.finish(focused('a'));
   await open;
   await h.panel.urlChanged();
   await h.panel.workspaceChanged(change('identity:other'));
@@ -126,146 +123,109 @@ test('closed panel cannot start tracker reads', async () => {
   assert.deepEqual(h.calls.map(({ name }) => name), ['focus.read', 'projects.list']);
 });
 
-test('focus and project list complete in either order', async () => {
-  for (const focusFirst of [true, false]) {
-    const h = harness();
-    const { open, focus, list } = await start(h);
-    if (focusFirst) {
-      focus.finish(mapped(1));
-      await Promise.resolve();
-      assert.equal(h.calls.length, 2);
-      list.finish(catalog());
-    } else {
-      list.finish(catalog());
-      await open;
-      assert.equal(h.state.catalog.projects.length, 2);
-      assert.equal(h.calls.length, 2);
-      focus.finish(mapped(1));
-    }
-    const request = await h.next('board.read');
-    assert.equal(request.input.project.id, 1);
-    request.finish(ok('Current board'));
-    await open;
-    assert.equal(h.state.selected, 1);
-  }
-});
-
-test('mapped focus supersedes stale board replies', async () => {
-  const h = harness();
+async function openPicker(h, workspace = focused('a')) {
   const { open, focus, list } = await start(h);
-  focus.finish(mapped(1));
-  list.finish(catalog());
-  const stale = await h.next('board.read');
-  const changed = h.panel.workspaceChanged(change('identity:two'));
-  const latestFocus = await h.next('focus.read');
-  assert.equal(stale.signal.aborted, true);
-  assert.equal(h.state.board, null);
-  latestFocus.finish(mapped(2));
-  const latest = await h.next('board.read');
-  latest.finish(ok('New board'));
-  await changed;
-  stale.finish(ok('Stale board'));
-  await open;
-  assert.equal(h.state.selected, 2);
-  assert.equal(h.state.board, 'New board');
-});
-
-test('a replacement project does not inherit a mapping', async () => {
-  const h = harness();
-  const { open, focus, list } = await start(h);
-  focus.finish(mapped(1));
-  list.finish(catalog([{ id: 3, ref: projects[0].ref }]));
-  await open;
-  assert.equal(h.state.selected, null);
-  assert.equal(h.state.catalog.projects[0].id, 3);
-  assert.equal(h.calls.length, 2);
-});
-
-test('manual selection wins a pending focus lookup', async () => {
-  const h = harness();
-  const { open, focus, list } = await start(h);
+  focus.finish(workspace);
   list.finish(catalog());
   await open;
-  const choosing = h.panel.pick(2);
+}
+
+async function pick(h, id) {
+  const choosing = h.panel.pick(id);
   const read = await h.next('board.read');
-  focus.finish(mapped(1));
-  read.finish(ok('Manual board'));
+  assert.equal(read.input.project.id, id);
+  read.finish(ok(`Board ${id}`));
   await choosing;
-  assert.equal(h.state.selected, 2);
-  assert.equal(h.state.board, 'Manual board');
-  assert.equal(h.calls.length, 3);
-});
+}
 
-test('refresh preserves a manual selection in the same focused workspace', async () => {
+test('switching workspaces clears the choice and does not remember it on return', async () => {
   const h = harness();
-  const { open, focus, list } = await start(h);
-  focus.finish(mapped(1));
-  list.finish(catalog());
-  (await h.next('board.read')).finish(ok('Mapped board'));
-  await open;
+  await openPicker(h);
   const choosing = h.panel.pick(2);
-  (await h.next('board.read')).finish(ok('Manual board'));
-  await choosing;
-
-  const refreshing = h.panel.refresh();
-  (await h.next('focus.read')).finish(mapped(1));
-  (await h.next('projects.list')).finish(catalog());
-  const request = await h.next('board.read');
-  request.finish(ok('Refreshed board'));
-  await refreshing;
-  assert.equal(request.input.project.id, 2);
-});
-
-test('returning to a mapped workspace during refresh drops the manual override', async () => {
-  const h = harness();
-  await h.panel.workspaceChanged(change('identity:a'));
-  const { open, focus, list } = await start(h);
-  focus.finish(mapped(1));
-  list.finish(catalog());
-  (await h.next('board.read')).finish(ok('Remembered A'));
-  await open;
-  const choosing = h.panel.pick(2);
-  (await h.next('board.read')).finish(ok('Manual B'));
-  await choosing;
-
-  const refreshing = h.panel.refresh();
-  const refreshFocus = await h.next('focus.read');
-  const pendingList = await h.next('projects.list');
+  const stale = await h.next('board.read');
   const away = h.panel.workspaceChanged(change('identity:b'));
-  const awayFocus = await h.next('focus.read');
+  assert.equal(stale.signal.aborted, true);
+  assert.equal(h.state.selected, null);
+  const awayRead = await h.next('focus.read');
   const back = h.panel.workspaceChanged(change('identity:a'));
-  const backFocus = await h.next('focus.read');
-  backFocus.finish(mapped(1));
+  (await h.next('focus.read')).finish(focused('a'));
   await back;
-  awayFocus.finish(mapped(2));
-  await away;
-  refreshFocus.finish(mapped(1));
-  pendingList.finish(catalog());
-  const board = await h.next('board.read');
-  board.finish(ok('Remembered A again'));
-  await refreshing;
-  assert.equal(board.input.project.id, 1);
+  awayRead.finish(focused('b'));
+  stale.finish(ok('Stale board'));
+  await Promise.all([away, choosing]);
+  assert.equal(h.state.focus.name, 'Workspace a');
+  assert.equal(h.state.selected, null);
+  assert.equal(h.state.board, null);
+  assert.equal(h.calls.filter(({ name }) => name === 'board.read').length, 1);
 });
 
-test('refresh retains a manual choice made before focus first resolves', async () => {
+test('refresh reloads the displayed board without reloading the picker', async () => {
   const h = harness();
-  await h.panel.workspaceChanged(change('identity:a'));
+  await openPicker(h);
+  await pick(h, 2);
+  const refresh = h.panel.refresh();
+  (await h.next('focus.read')).finish(focused('a'));
+  const board = await h.next('board.read');
+  assert.equal(board.input.project.id, 2);
+  board.finish(ok('Updated board'));
+  await refresh;
+  assert.equal(h.state.board, 'Updated board');
+  assert.equal(h.calls.filter(({ name }) => name === 'projects.list').length, 1);
+});
+
+test('refresh does not reload the old board if the worker sees focus move first', async () => {
+  const h = harness();
+  await openPicker(h);
+  await pick(h, 2);
+  const refresh = h.panel.refresh();
+  (await h.next('focus.read')).finish(focused('b'));
+  (await h.next('projects.list')).finish(catalog());
+  await refresh;
+  assert.equal(h.state.selected, null);
+  assert.equal(h.state.board, null);
+  assert.equal(h.calls.filter(({ name }) => name === 'board.read').length, 1);
+});
+
+test('an ID-less event rechecks focus without discarding a choice in the same workspace', async () => {
+  const h = harness();
+  await openPicker(h, focused('a', null));
+  await pick(h, 1);
+  const refreshing = h.panel.refresh();
+  const refreshRead = await h.next('focus.read');
+  const terminalChanged = h.panel.workspaceChanged(change(undefined));
+  (await h.next('focus.read')).finish(focused('a', null));
+  await terminalChanged;
+  refreshRead.finish(focused('a', null));
+  const board = await h.next('board.read');
+  assert.equal(board.input.project.id, 1);
+  board.finish(ok('Updated board'));
+  await refreshing;
+  assert.equal(h.state.board, 'Updated board');
+
+  const switched = h.panel.workspaceChanged(change(undefined));
+  (await h.next('focus.read')).finish(focused('b', null));
+  await switched;
+  assert.equal(h.state.selected, null);
+  assert.equal(h.state.board, null);
+});
+
+test('no workspace identity still permits manual selection and catalog refresh', async () => {
+  const h = harness();
   const { open, focus, list } = await start(h);
   list.finish(catalog());
   await open;
-  const choosing = h.panel.pick(2);
-  (await h.next('board.read')).finish(ok('Manual B'));
-  await choosing;
-
+  assert.equal(h.state.checkingFocus, true);
+  await h.panel.pick(2);
+  assert.equal(h.calls.length, 2);
+  const recheck = h.panel.workspaceChanged(change(undefined));
+  (await h.next('focus.read')).finish(ok(null));
+  focus.finish(ok(null));
+  await recheck;
+  await pick(h, 2);
+  assert.equal(h.state.board, 'Board 2');
+  await h.panel.pick(null);
   const refreshing = h.panel.refresh();
-  const refreshFocus = await h.next('focus.read');
-  const pendingList = await h.next('projects.list');
-  await h.panel.workspaceChanged(change('identity:a')); // Terminal change, not a new focus.
-  focus.finish(mapped(1));
-  pendingList.finish(catalog());
+  (await h.next('projects.list')).finish(catalog([projects[0]]));
   await refreshing;
-  refreshFocus.finish(mapped(1));
-  const board = await h.next('board.read');
-  board.finish(ok('Refreshed B'));
-  assert.equal(board.input.project.id, 2);
+  assert.deepEqual(h.state.catalog.projects, [projects[0]]);
 });

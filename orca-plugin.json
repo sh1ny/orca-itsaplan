@@ -13,7 +13,6 @@
   "capabilities": [
     { "kind": "settings:own" },
     { "kind": "secrets:own" },
-    { "kind": "storage:own" },
     { "kind": "workspace:read" }
   ],
   "contributes": {

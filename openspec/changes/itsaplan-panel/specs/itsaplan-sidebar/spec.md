@@ -55,28 +55,28 @@ The plugin SHALL initiate tracker reads only for an open sidebar. The sidebar SH
 - **THEN** the panel marks the corresponding result potentially incomplete
 
 ### Requirement: Follow a focused workspace
-The panel SHALL offer a manual choice without repository metadata. When an exact focus match exposes one Orca Git project’s host and project identity, the panel SHALL let the user remember the selected tracker project’s stable id and use it on subsequent focus. It SHALL NOT map by repository name.
+The panel SHALL follow Orca’s focused workspace. A manually selected tracker project lasts until focus changes; no per-workspace selection is saved or restored. The panel SHALL NOT infer a tracker project by repository name.
 
-#### Scenario: Switch between mapped projects
-- **WHEN** focus changes between workspaces belonging to two differently mapped Orca Git projects
-- **THEN** the panel loads the mapped Itsaplan project for each and an old request cannot replace the new selection
+#### Scenario: Switch workspace and return
+- **WHEN** a user picks a project, switches to another workspace, and returns
+- **THEN** the panel clears the selection and does not restore it; an old board response cannot redraw it
 
-#### Scenario: Focus and project list resolve in either order
-- **WHEN** initial or new-instance focus resolves before or after the fresh projects list
-- **THEN** the picker loads in either order, and the available mapped project is selected after both results arrive unless superseded by a manual choice
+#### Scenario: Refresh the displayed view
+- **WHEN** the user presses Refresh
+- **THEN** the panel reloads the selected project board if focus is unchanged, or the picker when there is no current selection
 
-#### Scenario: Reused tracker route
-- **WHEN** a remembered tracker project is deleted and its qualified ref now identifies a different project
-- **THEN** the replacement is not selected by that mapping and remains manually selectable
+#### Scenario: Focus changes before its event arrives
+- **WHEN** Refresh detects a different current workspace before Orca delivers the notification
+- **THEN** the panel clears the selection and does not request the previous board
+
+#### Scenario: Workspace event without a public identifier
+- **WHEN** an Orca event omits the public workspace identifier
+- **THEN** the panel rechecks focus and keeps the selection if the resolved identity did not change
 
 #### Scenario: Tracker route reused during a board load
 - **WHEN** the tracker issues read succeeds but the scaffold identifies a replacement project under the same ref
 - **THEN** the board load is refused and no issue from either project is rendered under that selection
 
-#### Scenario: Manual choice during focus lookup
-- **WHEN** a person picks a project manually while a focus lookup is pending
-- **THEN** the pending result does not override the newer manual selection
-
-#### Scenario: No reliable repository identity
-- **WHEN** Orca does not expose a focused workspace’s Git project identity
+#### Scenario: No reliable workspace identity
+- **WHEN** Orca does not expose a focused workspace’s identity
 - **THEN** the project picker remains usable without guessing or editing the workspace
