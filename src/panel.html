@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>It's a Plan</title>
+  <link rel="stylesheet" href="./panel.css">
+  <script type="module" src="./panel.mjs"></script>
+</head>
+<body>
+  <main>
+    <header><h1>It's a Plan</h1><button id="refresh" type="button">Refresh</button></header>
+    <p id="connection-status" role="status">Loading projects…</p>
+    <details id="credentials">
+      <summary>Connection</summary>
+      <p id="base"></p>
+      <form id="connect" autocomplete="off">
+        <label for="key">API key</label>
+        <input id="key" type="password" autocomplete="off" spellcheck="false" maxlength="4096" required>
+        <div class="actions">
+          <button id="save" type="submit">Save key</button>
+          <button id="clear" type="button">Clear key</button>
+        </div>
+      </form>
+    </details>
+    <p id="action-status" role="status" hidden></p>
+    <section id="picker" hidden aria-label="Project selection">
+      <label for="project">Project</label>
+      <select id="project"></select>
+      <p id="catalog-note" hidden>Showing the first 500 projects. More projects may be available.</p>
+      <div class="mapping">
+        <p id="focus"></p>
+        <button id="remember" type="button" hidden>Remember for this Orca project</button>
+      </div>
+    </section>
+    <p id="board-status" role="status" hidden></p>
+    <div id="board"></div>
+  </main>
+</body>
+</html>

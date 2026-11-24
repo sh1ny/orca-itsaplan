@@ -1,0 +1,224 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import activate from '../src/worker.mjs';
+
+const base = 'https://plan.example.test/prefix';
+const other = 'https://other.example.test';
+const key = 'test-opaque-credential';
+const selected = { id: 8, ref: 'alpha.ENG' };
+const project = (id, ref) => ({ id, ref, teamName: ref.split('.')[0], name: 'Engineering' });
+const column = (id, name, position, stateType) => ({ id, name, position, stateType });
+const issue = (id, columnId, parentId = null) => ({ id, columnId, parentId, title: `Work ${id}`, identifier: `ENG-${id}`, position: id });
+const initiative = { projectId: 8, title: 'Ship', status: 'active', progress: { completed: 2, total: 5 } };
+const scaffold = (id = 8, initiativesEnabled = true) => ({
+  project: { id, initiativesEnabled }, columns: [column(2, 'Done', 2, 'completed'), column(1, 'Open', 1, 'started')],
+});
+const json = (value, status = 200) => new Response(JSON.stringify(value), { status });
+
+function harness(fetch, configure = {}) {
+  let url = base;
+  let secret = configure.secret === null ? null : JSON.stringify({ url, key });
+  let workspaces = [];
+  let focusId = 'local-test';
+  const stored = new Map();
+  const handlers = new Map();
+  const calls = [];
+  activate({
+    settings: { get: async () => url },
+    secrets: {
+      get: async () => secret,
+      set: async (_, value) => { if (configure.beforeStore) await configure.beforeStore(); secret = value; },
+      delete: async () => { secret = null; },
+    },
+    storage: { get: async (k) => stored.get(k), set: async (k, v) => stored.set(k, v) },
+    host: { call: async (method) => method === 'workspace.readContext' ? { workspaceId: focusId } : { workspaces } },
+    panels: { handle: (name, handler) => handlers.set(name, handler) },
+  }, { deadline: configure.deadline, fetch: (uri, options) => { calls.push(uri); return fetch(uri, options); } });
+  return {
+    calls,
+    setUrl: (value) => { url = value; },
+    workspace: (id, rows) => { focusId = id; workspaces = rows; },
+    run: (name, data = {}, panel = 'a', signal = new AbortController().signal) => handlers.get(name)(
+      { base, ...data }, { panel: panel && { id: panel, surface: 'panel' }, signal },
+    ),
+    board: (data = selected, panel, signal) => handlers.get('board.read')(
+      { base, project: data }, { panel: { id: panel ?? 'a', surface: 'panel' }, signal: signal ?? new AbortController().signal },
+    ),
+  };
+}
+
+function boardResponses(url, rows, details = scaffold(), initiatives = { items: [initiative], total: 1 }) {
+  if (url.includes('/issues?')) return json(rows);
+  if (url.includes('/initiatives?')) return initiatives instanceof Response ? initiatives : json(initiatives);
+  return json(details);
+}
+
+test('refuses unpaired credentials without a GET', async () => {
+  const h = harness(() => assert.fail('unpaired request reached transport'));
+  h.setUrl(other);
+  assert.deepEqual(await h.run('projects.list', { base: other }), { ok: false, code: 'missing_key' });
+  h.setUrl('http://plan.example.test');
+  assert.equal((await h.run('projects.list')).code, 'invalid_url');
+  assert.deepEqual(h.calls, []);
+});
+
+test('URL edits cannot rebind a pending key', async () => {
+  const entered = Promise.withResolvers();
+  const release = Promise.withResolvers();
+  const h = harness(() => assert.fail('old key sent to new URL'), {
+    secret: null, beforeStore: () => { entered.resolve(); return release.promise; },
+  });
+  const saving = h.run('connection.save', { key });
+  await entered.promise;
+  h.setUrl(other);
+  release.resolve();
+  assert.deepEqual(await saving, { ok: true, value: null });
+  assert.equal((await h.run('projects.list', { base: other })).code, 'missing_key');
+  assert.equal((await h.run('connection.save', { key })).code, 'url_changed');
+  assert.deepEqual(h.calls, []);
+});
+
+test('keeps proxy path and refuses redirects', async () => {
+  const h = harness((url, options) => {
+    assert.equal(url, `${base}/projects`);
+    assert.equal(options.method, 'GET');
+    assert.equal(options.headers['x-api-key'], key);
+    if (options.redirect !== 'error') return json([project(8, 'alpha.ENG')]);
+    return Promise.reject(new TypeError('redirect refused'));
+  });
+  assert.deepEqual(await h.run('projects.list'), { ok: false, code: 'connection' });
+  assert.deepEqual(h.calls, [`${base}/projects`]);
+  assert.equal((await h.board({ id: 8, ref: '../stolen/path' })).code, 'invalid_project');
+});
+
+test('bounds decoded bytes and slow bodies', async () => {
+  const huge = harness(() => new Response(new Uint8Array(2 * 1024 * 1024 + 1)));
+  assert.equal((await huge.run('projects.list')).code, 'too_large');
+  const started = Promise.withResolvers();
+  const clock = new AbortController();
+  const slow = harness((_, { signal }) => new Response(new ReadableStream({
+    start(controller) { signal.addEventListener('abort', () => controller.error(signal.reason), { once: true }); },
+    pull() { started.resolve(); },
+  })), { deadline: () => clock.signal });
+  const reading = slow.run('projects.list');
+  await started.promise;
+  clock.abort();
+  assert.equal((await reading).code, 'timeout');
+});
+
+test('coalesces superseded selections', async () => {
+  const first = Promise.withResolvers();
+  const started = Promise.withResolvers();
+  const h = harness((url) => {
+    if (url.includes('alpha.ENG')) { started.resolve(); return first.promise; }
+    return url.includes('/issues?') ? json([]) : json(scaffold(10, false));
+  });
+  const a = h.board();
+  await started.promise;
+  const b = h.board({ id: 9, ref: 'beta.ENG' });
+  const c = h.board({ id: 10, ref: 'gamma.ENG' });
+  assert.equal((await b).code, 'cancelled');
+  assert.equal(h.calls.length, 1);
+  first.resolve(json([]));
+  assert.equal((await a).code, 'cancelled');
+  assert.equal((await c).ok, true);
+  assert.ok(h.calls.every((url) => !url.includes('beta.ENG')));
+});
+
+test("preserves another panel's request", async () => {
+  const start = Promise.withResolvers();
+  const first = Promise.withResolvers();
+  let number = 0;
+  const h = harness((_, { signal }) => {
+    if (number++ === 0) { start.resolve(signal); return first.promise; }
+    return json([]);
+  });
+  const a = h.run('projects.list', {}, 'a');
+  const signal = await start.promise;
+  const b = h.run('projects.list', {}, 'b');
+  assert.equal((await h.run('projects.list', {}, 'c')).code, 'busy');
+  assert.equal(signal.aborted, false);
+  first.resolve(json([]));
+  assert.equal((await a).ok, true);
+  assert.equal((await b).ok, true);
+});
+
+test('preserves qualified projects from different teams', async () => {
+  const h = harness(() => json([project(8, 'alpha.ENG'), { ...project(9, 'beta.ENG'), name: key }]));
+  assert.deepEqual((await h.run('projects.list')).value, { projects: [
+    { id: 8, team: 'alpha', name: 'Engineering', ref: 'alpha.ENG' },
+    { id: 9, team: 'beta', name: '[redacted]', ref: 'beta.ENG' },
+  ], partial: false });
+  assert.equal((await h.run('projects.list', {}, null)).code, 'cancelled');
+  assert.equal(h.calls.length, 1);
+});
+
+test('projects only bounded board data and counts listed children', async () => {
+  const rows = [issue(6, 2, 4), issue(5, 1, 4), { ...issue(4, 1), description: key }];
+  const h = harness((url) => boardResponses(url, rows));
+  assert.deepEqual((await h.board()).value, {
+    groups: [
+      { name: 'Open', issues: [
+        { identifier: 'ENG-4', title: 'Work 4', progress: { completed: 1, total: 2 } },
+        { identifier: 'ENG-5', title: 'Work 5', progress: null },
+      ] },
+      { name: 'Done', issues: [{ identifier: 'ENG-6', title: 'Work 6', progress: null }] },
+    ], count: 3, initiatives: { items: [{ title: 'Ship', completed: 2, total: 5 }], partial: false }, partial: false,
+  });
+  assert.equal(h.calls.length, 3);
+});
+
+test('keeps tracker issue order when lightweight rows omit positions', async () => {
+  const rows = [issue(6, 1), { ...issue(4, 1), position: undefined }, issue(5, 1)];
+  const h = harness((url) => boardResponses(url, rows, scaffold(8, false)));
+  assert.deepEqual((await h.board()).value.groups[0].issues.map(({ identifier }) => identifier),
+    ['ENG-6', 'ENG-4', 'ENG-5']);
+});
+
+test('optional initiatives do not hide unknown-column issues', async () => {
+  for (const [enabled, page] of [[true, json({}, 403)], [false, null], [true, { items: [{ ...initiative, projectId: 9 }], total: 1 }]]) {
+    const h = harness((url) => boardResponses(url, [issue(4, 99)], scaffold(8, enabled), page));
+    const { value } = await h.board();
+    assert.equal(value.initiatives, null);
+    assert.equal(value.groups.at(-1).name, 'Unknown column');
+    assert.equal(value.groups.at(-1).issues[0].identifier, 'ENG-4');
+    assert.equal(h.calls.length, enabled ? 3 : 2);
+  }
+});
+
+test('reports partial board and catalog results', async () => {
+  const h = harness((url) => url.endsWith('/projects')
+    ? json(Array.from({ length: 550 }, (_, i) => project(i + 1, `team${i}.ENG`)))
+    : boardResponses(url, Array.from({ length: 210 }, (_, i) => issue(i + 1, 1)), scaffold(), { items: [initiative], total: 12 }));
+  const list = (await h.run('projects.list')).value;
+  const board = (await h.board()).value;
+  assert.equal(list.projects.length, 500);
+  assert.equal(list.partial, true);
+  assert.equal(board.count, 200);
+  assert.equal(board.partial, true);
+  assert.equal(board.initiatives.partial, true);
+});
+
+test('rejects replacement scaffold after issue read', async () => {
+  const h = harness((url) => boardResponses(url, [issue(4, 1)], scaffold(9)));
+  assert.deepEqual(await h.board(), { ok: false, code: 'project_changed' });
+  assert.deepEqual(h.calls, [`${base}/projects/alpha.ENG/issues?limit=200`, `${base}/projects/alpha.ENG`]);
+});
+
+test('ambiguous or absent workspace metadata falls back to manual', async () => {
+  const h = harness(() => assert.fail('focus must not start a GET'));
+  const row = { id: 'identity:one', hostId: 'ssh:host', projectId: 'repo', kind: 'worktree', project: 'Repo', path: '/private/path' };
+  for (const rows of [[], [row, row], [{ ...row, hostId: null }], [{ ...row, kind: 'folder' }]]) {
+    h.workspace(row.id, rows);
+    assert.deepEqual(await h.run('focus.read'), { ok: true, value: null });
+  }
+  h.workspace(row.id, [row]);
+  const { value } = await h.run('focus.read');
+  assert.deepEqual(Object.keys(value).sort(), ['mappedId', 'name', 'token']);
+  h.workspace('identity:two', [{ ...row, id: 'identity:two', hostId: 'local' }]);
+  assert.equal((await h.run('focus.save', { token: value.token, projectId: 8 })).code, 'focus_changed');
+  h.workspace(row.id, [row]);
+  assert.equal((await h.run('focus.save', { token: value.token, projectId: 8 })).ok, true);
+  h.workspace('identity:child', [{ ...row, id: 'identity:child' }]);
+  assert.equal((await h.run('focus.read')).value.mappedId, 8);
+});

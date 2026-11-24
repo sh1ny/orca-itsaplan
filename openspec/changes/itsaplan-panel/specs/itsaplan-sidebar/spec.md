@@ -32,7 +32,7 @@ The plugin SHALL use an approved trusted worker to read one configured Itsaplan 
 - **THEN** it receives a busy result without aborting a read owned by another session
 
 ### Requirement: Project board summary
-The plugin SHALL initiate tracker reads only for an open sidebar session. The sidebar SHALL distinguish projects by team, show active initiatives for the selected project when permitted, and group recent issues by tracker column order. It SHALL show completed versus total listed direct subtasks when available and visibly identify results limited by the spike. It SHALL NOT poll, perform per-issue reads or tracker writes, create worktrees, include tracker-specific presets, or add a native Orca Tasks provider.
+The plugin SHALL initiate tracker reads only for an open sidebar. The sidebar SHALL distinguish teams, show permitted active initiatives, group recent issues by tracker column order, show completion of listed direct subtasks, and flag capped results. The plugin SHALL NOT poll, read individual issues, write to the tracker, create worktrees, ship tracker-specific presets, or integrate with native Orca Tasks.
 
 #### Scenario: No open sidebar
 - **WHEN** the worker starts or Orca settings or workspace focus change without an open sidebar session

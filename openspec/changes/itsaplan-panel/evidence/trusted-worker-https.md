@@ -1,0 +1,5 @@
+# Trusted-worker HTTPS and secret-store proof
+
+In Orca Desktop 1.4.273 on Windows, a disposable local `trusted-worker` plugin declared only `settings:own` and `secrets:own` and a panel contribution for the development bridge. Orca required explicit approval; the manifest declared no network capability. A development request saved the instance HTTPS base with Orca settings and saved the selected API key with Orca secrets. After `orca plugin restart` stopped the worker, a fresh development request read only those stored values, used Node `fetch` with `x-api-key`, and reported `{ "ok": true, "status": 200 }` for authenticated `GET /me`. No instance address, credential, or response content was output. The probe deleted its own secret, checked the secret read back as absent, cleared its URL setting, and was unloaded.
+
+This verifies outbound HTTPS and actual secret storage across a worker restart on that host. It does not verify unauthenticated hosts, TLS certificate exceptions, panel behavior, or another operating system.
