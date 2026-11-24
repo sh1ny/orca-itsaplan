@@ -14,7 +14,7 @@ People working in Orca currently have to switch to their tracker to see the proj
 ## What Changes
 
 - Prove HTTPS access in an approved Orca trusted worker using its real secret store, then show a sidebar with project selection, active initiatives and issues grouped by board column.
-- Let users pick any accessible project. The sidebar follows workspace focus and clears the manual choice on a switch, without remembering choices per workspace. Determine what identity data Orca exposes for local, WSL and SSH workspaces.
+- On open or Refresh, read the open Orca workspace and select its tracker project when the workspace is explicitly named for an exact team-qualified project reference. Otherwise offer the manual picker. Do not subscribe to focus or workspace events or save per-workspace choices.
 - Show progress inferred from listed subtasks, with no extra request per issue. Report which claims the live spike verified, and which environments it could not observe.
 - Scope: one instance per plugin installation and no Itsaplan writes, background polling, tracker-specific presets, worktree creation or native Orca Tasks integration.
 
@@ -22,7 +22,7 @@ People working in Orca currently have to switch to their tracker to see the proj
 
 ### New Capabilities
 
-- `itsaplan-sidebar`: Read-only project boards with encrypted connection credentials and a manual selection scoped to current Orca focus.
+- `itsaplan-sidebar`: Read-only project boards with encrypted connection credentials and a workspace snapshot on open and Refresh.
 
 ### Modified Capabilities
 
@@ -45,10 +45,10 @@ DECISION_MAKING: important
 - **Important:** Yes; review and permission limits are part of the spike.
 - **Chosen by:** User.
 
-### S2: No remembered workspace selection
+### S2: Workspace snapshots, not live following
 
-- **Choice:** Follow Orca focus; a hand-picked tracker project lasts only for the current focus. Refresh reloads the board or picker already shown.
-- **Rejected:** Per-workspace preferences and automatic project restoration across switches.
+- **Choice:** Check the open workspace only on panel open and explicit Refresh. A hand pick ends when a check successfully resolves a workspace. A failed check retains a hand pick as manual and does not use a previous automatic project.
+- **Rejected:** Live focus events, per-workspace preferences, and restoring a project by workspace history.
 - **Reversal cost:** Low; no mapping data is stored.
-- **Important:** Yes; this replaces the initial mapping scope after pre-ship review.
+- **Important:** Yes; this supersedes the earlier focus-following scope.
 - **Chosen by:** User.

@@ -104,7 +104,7 @@ const panel = createPanel({
     key.disabled = !state.base || state.saving;
     find('save').disabled = key.disabled;
     find('clear').disabled = state.saving || state.catalogStatus === 'loading';
-    refresh.disabled = state.catalogStatus === 'loading' || state.saving || state.checkingFocus;
+    refresh.disabled = state.catalogStatus === 'loading' || state.saving || state.checkingWorkspace;
     picker.hidden = !state.catalog?.projects.length;
     find('catalog-note').hidden = !state.catalog?.partial;
     if (shownCatalog !== state.catalog) {
@@ -114,9 +114,11 @@ const panel = createPanel({
       ) ?? []));
     }
     select.value = state.selected ?? '';
-    select.disabled = state.checkingFocus;
-    message(find('focus'), state.focus?.name ? `Focused workspace: ${state.focus.name}.`
-      : 'No workspace identified. Choose a project manually.');
+    select.disabled = state.checkingWorkspace;
+    message(find('workspace'), state.checkingWorkspace ? 'Checking which workspace is open…'
+      : state.workspace ? `Workspace at last check: ${state.workspace}.${state.catalog && state.selected === null
+        ? ' No matching project selected. Pick one below.' : ''}`
+        : `Couldn’t tell which workspace is open. Pick a project.${state.selected === null ? '' : ' Showing your manual selection.'}`);
     message(find('board-status'), state.boardStatus === 'loading' ? 'Loading board…' : messageFor(state.boardStatus));
     if (shownBoard !== state.board) { shownBoard = state.board; renderBoard(state.board); }
   },
@@ -126,7 +128,6 @@ find('connect').addEventListener('submit', (event) => { event.preventDefault(); 
 find('clear').addEventListener('click', () => { void panel.clearKey(); });
 refresh.addEventListener('click', () => { void panel.refresh(); });
 select.addEventListener('change', () => { void panel.pick(Number(select.value) || null); });
-const workspace = host.on('workspace.changed', (event) => { void panel.workspaceChanged(event); });
 const settings = host.settings.onDidChange(({ key: changed }) => { if (changed === URL_SETTING) void panel.urlChanged(); });
-window.addEventListener('pagehide', () => { workspace.dispose(); settings.dispose(); panel.close(); frame.close(); }, { once: true });
+window.addEventListener('pagehide', () => { settings.dispose(); panel.close(); frame.close(); }, { once: true });
 void panel.open();

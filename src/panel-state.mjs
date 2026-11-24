@@ -2,13 +2,12 @@ import { normalizeBase } from './connection.mjs';
 
 export function createPanel({ readSetting, request, render, clearDraft }) {
   const state = {
-    base: null, catalog: null, focus: null, selected: null, board: null,
-    catalogStatus: 'loading', boardStatus: null, actionStatus: null, saving: false, checkingFocus: false,
+    base: null, catalog: null, workspace: null, selected: null, board: null,
+    catalogStatus: 'loading', boardStatus: null, actionStatus: null, saving: false, checkingWorkspace: false,
   };
   let disposed = false;
   let connectionGeneration = 0;
-  let focusRead;
-  let observedId;
+  let manualChoice;
   let catalogRequest;
   let boardRequest;
   const draw = () => { if (!disposed) render(state); };
@@ -41,46 +40,32 @@ export function createPanel({ readSetting, request, render, clearDraft }) {
     draw();
   }
 
-  function clearSelection() {
+  function reconcile() {
+    if (state.checkingWorkspace || !state.catalog) return;
+    if (manualChoice !== undefined) return board(manualChoice);
+    const matches = state.catalog.projects.filter(({ ref }) => ref === state.workspace);
+    return board(matches.length === 1 ? matches[0].id : null);
+  }
+
+  async function checkWorkspace() {
+    state.checkingWorkspace = true;
+    state.workspace = null;
     state.selected = null;
     clearBoard();
-  }
-
-  function followFocus() {
-    if (disposed) return;
-    state.checkingFocus = true;
-    const read = (async () => {
-      const result = await call('focus.read', null, { timeoutMs: 5_000 });
-      if (disposed || focusRead !== read) return;
-      state.checkingFocus = false;
-      if (result.ok) {
-        const next = result.value;
-        if ((state.focus?.token ?? null) !== (next?.token ?? null)) clearSelection();
-        state.focus = next;
-        observedId = next?.eventId ?? null;
-      }
-      draw();
-    })();
-    focusRead = read;
     draw();
-    return read;
+    const result = await call('workspace.snapshot', null, { timeoutMs: 5_000 });
+    if (disposed) return;
+    state.checkingWorkspace = false;
+    if (result.ok && result.value) {
+      state.workspace = result.value;
+      manualChoice = undefined;
+    }
+    draw();
+    return reconcile();
   }
 
-  async function refresh() {
-    if (disposed || state.saving || state.catalogStatus === 'loading') return;
-    const connection = connectionGeneration;
-    if (state.selected !== null) {
-      // Context may change before Orca delivers the debounced event.
-      let current = followFocus();
-      while (current) {
-        await current;
-        if (disposed || connection !== connectionGeneration) return;
-        if (current === focusRead) break;
-        current = focusRead;
-      }
-      if (state.selected !== null) return board(state.selected);
-    }
-    return loadCatalog();
+  async function reload() {
+    await Promise.all([checkWorkspace(), loadCatalog()]);
   }
 
   async function loadCatalog() {
@@ -89,7 +74,8 @@ export function createPanel({ readSetting, request, render, clearDraft }) {
     const controller = new AbortController();
     catalogRequest?.abort();
     catalogRequest = controller;
-    clearSelection();
+    state.selected = null;
+    clearBoard();
     Object.assign(state, { base: null, catalog: null, catalogStatus: 'loading', actionStatus: null, saving: false });
     clearDraft();
     draw();
@@ -107,6 +93,7 @@ export function createPanel({ readSetting, request, render, clearDraft }) {
     state.catalogStatus = result.ok ? null : result.code;
     state.catalog = result.ok ? result.value : null;
     draw();
+    return reconcile();
   }
 
   async function credential(method, key) {
@@ -127,21 +114,20 @@ export function createPanel({ readSetting, request, render, clearDraft }) {
 
   return {
     open() {
-      if (!focusRead) void followFocus();
+      if (disposed) return;
+      return reload();
+    },
+    refresh() {
+      if (disposed || state.saving || state.checkingWorkspace || state.catalogStatus === 'loading') return;
+      return reload();
+    },
+    urlChanged() {
+      manualChoice = undefined;
       return loadCatalog();
     },
-    refresh,
-    urlChanged: loadCatalog,
-    workspaceChanged({ context } = {}) {
-      if (disposed) return;
-      const next = context?.workspaceId;
-      if (next && next === observedId) return;
-      if ((next && observedId) || (context === null && state.focus?.token)) clearSelection();
-      if (next) observedId = next;
-      return followFocus();
-    },
     pick(id) {
-      if (disposed || !state.catalog || state.checkingFocus) return;
+      if (disposed || !state.catalog || state.checkingWorkspace) return;
+      manualChoice = id;
       return board(id);
     },
     saveKey: (key) => credential('connection.save', key),

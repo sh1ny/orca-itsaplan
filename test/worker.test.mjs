@@ -252,17 +252,11 @@ test('rejects replacement scaffold after issue read', async () => {
   assert.deepEqual(h.calls, [`${base}/projects/10.ENG/issues?limit=200`, `${base}/projects/10.ENG`]);
 });
 
-test('projects raw workspace identities as distinct opaque focus tokens', async () => {
-  const h = harness(() => assert.fail('focus must not start a tracker GET'));
-  assert.deepEqual(await h.run('focus.read'), { ok: true, value: null });
-  h.workspace({ workspaceId: 'repo::/private/wsl/branch', displayName: 'Same name' });
-  const { value: first } = await h.run('focus.read');
-  h.workspace({ workspaceId: 'repo::/private/ssh/branch', displayName: 'Same name' });
-  const { value: second } = await h.run('focus.read');
-  assert.equal(first.name, second.name);
-  assert.equal(first.eventId, null);
-  assert.match(first.token, /^[0-9a-f]{64}$/);
-  assert.notEqual(first.token, second.token);
-  h.workspace({ workspaceId: 'identity:one', displayName: 'Named workspace' });
-  assert.equal((await h.run('focus.read')).value.eventId, 'identity:one');
+test('workspace snapshot exposes only the identifiable workspace display name', async () => {
+  const h = harness(() => assert.fail('a workspace snapshot must not start a tracker GET'));
+  assert.deepEqual(await h.run('workspace.snapshot'), { ok: true, value: null });
+  h.workspace({ displayName: 'team.ONE' });
+  assert.deepEqual(await h.run('workspace.snapshot'), { ok: true, value: null });
+  h.workspace({ workspaceId: 'repo::/private/repo/path', displayName: 'team.ONE' });
+  assert.deepEqual(await h.run('workspace.snapshot'), { ok: true, value: 'team.ONE' });
 });

@@ -16,12 +16,11 @@
 | Project board summary | Grouped board with subtasks | test/worker.test.mjs | projects only bounded board data and counts listed children | green |
 | Project board summary | Unavailable initiatives and missing column | test/worker.test.mjs | optional initiatives do not hide unknown-column issues | green |
 | Project board summary | Partial board | test/worker.test.mjs | reports partial board and catalog results | green |
-| Follow a focused workspace | Switch workspace and return | test/panel.test.mjs | switching workspaces clears the choice and does not remember it on return | green |
-| Follow a focused workspace | Refresh the displayed view | test/panel.test.mjs | refresh reloads the displayed board without reloading the picker; no workspace identity still permits manual selection and catalog refresh | green |
-| Follow a focused workspace | Focus changes before its event arrives | test/panel.test.mjs | refresh does not reload the old board if the worker sees focus move first | green |
-| Follow a focused workspace | Workspace event without a public identifier | test/panel.test.mjs; test/worker.test.mjs | an ID-less event rechecks focus without discarding a choice in the same workspace; projects raw workspace identities as distinct opaque focus tokens | green |
-| Follow a focused workspace | Tracker route reused during a board load | test/worker.test.mjs | rejects replacement scaffold after issue read | green |
-| Follow a focused workspace | No reliable workspace identity | test/panel.test.mjs | no workspace identity still permits manual selection and catalog refresh | green |
+| Workspace project snapshot | Open on a named workspace | test/panel.test.mjs | opening shows an exact workspace project after both reads complete | green |
+| Workspace project snapshot | Refresh resolves a workspace | test/panel.test.mjs | a successful Refresh replaces a hand pick with the freshly resolved workspace project | green |
+| Workspace project snapshot | Workspace check fails | test/panel.test.mjs; test/worker.test.mjs | failed workspace check retains a hand pick as manual and ignores the old board reply; failed workspace check never refreshes the previous automatic board; workspace snapshot exposes only the identifiable workspace display name | green |
+| Workspace project snapshot | Workspace name does not match | test/panel.test.mjs | an unmatched workspace name does not guess a tracker project | green |
+| Workspace project snapshot | Tracker route reused during a board load | test/worker.test.mjs | rejects replacement scaffold after issue read | green |
 
 ## 1. Read-only sidebar
 

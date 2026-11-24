@@ -20,7 +20,7 @@ The normal worktree gate could not start: there was no OpenSpec root or installe
 
 ### D1: One read-only worker, isolated HTML panel
 
-The panel uses native HTML/DOM and Orca’s theme properties. It calls a small worker bridge for project lists, selected boards, credential changes and current focus. Untrusted strings become text nodes; the worker returns only projected rows with bounded display text. Declare `settings:own`, `secrets:own` and `workspace:read`; no write access to workspaces or terminals. The panel subscribes to Orca workspace and URL changes. No ambient credential lookup in shipped code.
+The HTML panel calls a trusted worker for project lists, selected boards, credential changes and a workspace snapshot. Untrusted strings become text nodes; the worker returns only projected rows with bounded display text. Declare `settings:own`, `secrets:own` and `workspace:read`; no write access to workspaces or terminals. The panel subscribes only to URL setting changes for invalidating credentials and boards, not to workspace or focus events. No ambient credential lookup in shipped code.
 
 ### D2: Paired URL and key
 
@@ -32,7 +32,7 @@ Fetch `/projects` for accessible projects and label by team and project. Load th
 
 Read the lightweight issues before the scaffold and validate the scaffold’s `project.id` against the selected stable id before projecting any issue. A ref reused after deletion during this batch cannot pass that final identity check; a mismatch fails the required board load, never creating an unknown-column group. Read initiatives only after that check, and reject the optional initiative section if any returned `projectId` differs. The scaffold and initiative checks require no additional GET.
 
-Read focus via worker `workspace.readContext`, using its workspace id as an opaque hash (never send a path-bearing id to the panel). Display the workspace name but do not use it to select a tracker project. As the owner directed after pre-ship review, the active selection is held only in the panel, cleared on a workspace switch, and never restored on return. When no distinct identity is available, the manual picker remains usable without guessing.
+On panel open or Refresh, read `workspace.readContext` in the worker. An identifiable workspace returns its display name, not its id or path. Treat a workspace explicitly named with an exact team-qualified tracker project ref as a declaration of its project. Select only one exact catalog match. Ordinary names, duplicate refs and missing or failed context never guess a project. Hand picks are local to the panel and last until a workspace check succeeds; a failed check can reload the hand pick as manual but never reloads a previous automatic board.
 
 ### Decision summary
 
@@ -51,7 +51,7 @@ Read focus via worker `workspace.readContext`, using its workspace id as an opaq
 
 - Tracker operations are GET-only, with one HTTPS base, encrypted URL-bound credentials, no redirects and no credential in replies or logs. Durable home: `itsaplan-sidebar` requirement Read-only HTTPS connection.
 - Only the panel loads data; no polling, no per-issue reads, listed-only subtask progress, no native Tasks provider, no worktree creation, and no tracker-specific presets. Durable home: `itsaplan-sidebar` requirement Project board summary.
-- No remembered project preference or name inference across focus transitions. Durable home: `itsaplan-sidebar` requirement Follow a focused workspace.
+- Snapshot on open or Refresh only, no focus subscriptions or per-workspace preferences. Durable home: `itsaplan-sidebar` requirement Workspace project snapshot.
 - No package dependencies or build products required to install. Durable home: README development and installation instructions.
 
 ## Diagrams (FULL)
@@ -68,14 +68,15 @@ flowchart LR
 
 ```mermaid
 sequenceDiagram
-  participant Orca
+  participant Person
   participant Panel
   participant Worker
+  participant Orca
   participant Itsaplan
-  Orca-->>Panel: workspace.changed
-  Panel->>Worker: read current focus identity
-  Note over Panel: Clear selection if focus changed
-  Person->>Panel: choose a project
+  Person->>Panel: open or Refresh
+  Panel->>Worker: request workspace snapshot
+  Worker->>Orca: workspace.readContext
+  Note over Panel: Match one exact project ref or show picker
   Panel->>Worker: request latest selected board
   Worker->>Itsaplan: GET issues, scaffold, active initiatives
   Itsaplan-->>Worker: project data
@@ -89,7 +90,7 @@ sequenceDiagram
 | --- | --- | --- |
 | API base URL | Orca setting | Plugin installation |
 | URL-bound key | Orca encrypted secret store | Until replaced or cleared |
-| Manual selection | Panel | Current focused workspace only |
+| Workspace snapshot and manual selection | Panel | Snapshot until the next check; hand pick until a successful check or teardown |
 | Draft key | Password control | Until submission or close |
 | Projects, board, UI generations | Panel | Until refresh or close |
 | In-flight GETs, latest pending read | Worker request lane | Body deadline, completion or cancellation |
@@ -100,11 +101,11 @@ Invalid URL, stale draft, missing key, unavailable keyring and network/HTTP erro
 
 ## Resource Bounds (FULL)
 
-One project-list GET when loading or refreshing the picker, or up to three sequential GETs when loading or refreshing a board: issues, identity-checked scaffold, and initiatives when enabled. The worker lane has one active batch and one pending slot. A newer read from the same panel session replaces its pending request and aborts its active request, except a board cannot displace a project-list read. Another session may fill an empty pending slot but cannot displace another session’s work. Superseded and cancelled reads get a fixed cancelled outcome; a full lane can return busy. Only an open sidebar session can initiate tracker reads. Cap each decoded HTTP body at 2 MiB before JSON parsing and apply a deadline through body consumption. Cap projected projects at 500, issues at 200, initiatives at 100 and scaffold columns at 100. Use bounded strings and the 1 MiB bridge ceiling. Group and count with one pass, then sort by column and board position when known. Exercise byte caps, slow bodies and supersession with deterministic signals and streams.
+Opening or refreshing the panel makes one workspace host call, one project-list GET, and up to three sequential GETs if a project is selected: issues, identity-checked scaffold and enabled initiatives. The worker lane has one active batch and one pending slot. New work may replace its own pending read and abort its own active read; a board cannot displace a project list. Another session may fill an empty slot but cannot displace another session’s work. Only an open sidebar can initiate tracker reads. Cap decoded bodies at 2 MiB before parsing with a deadline through body consumption. Cap projects at 500, issues at 200, initiatives and scaffold columns at 100. Bound display strings below the bridge ceiling. Group and count with one pass, then sort by column and board position when known.
 
 ## Flow & State Gaps (FULL)
 
-Opening the panel loads the picker and resolves focus independently. The picker is enabled after focus has been checked, even when Orca has no identity. A known focus transition clears the selection immediately and aborts the board; an ID-less event checks worker identity before clearing. Ignore duplicate known-id notifications and stale focus replies. Refresh the displayed board only after checking current focus, which can change before the debounced event. When nothing is selected, Refresh reloads the picker. A URL change immediately clears the password draft, list and board and cancels stale tracker work.
+Only open and Refresh request a workspace snapshot. Start the snapshot and catalog reads together and abort the old board before either resolves. Select a board only after both are ready. A successful workspace check discards any hand pick, even without a matching tracker ref; a failed check uses only the hand pick and labels it manual. Ignore cancelled board replies. URL changes clear the draft, list and board and never trigger a new workspace snapshot.
 
 Successful key save for the current base invalidates prior connection results and starts a fresh list through the same list-before-board path, including recovery from missing-key errors. A save completion superseded by a URL edit or panel disposal cannot refresh the obsolete connection.
 
@@ -115,8 +116,8 @@ Successful key save for the current base invalidates prior connection results an
 | URL-bound encrypted secret and disabled redirects | Credential replay against a changed URL or redirect target |
 | Deadline through the body, byte cap, and bounded latest-read lane | Hung UI and unbounded memory or request fan-out |
 | GET-only adapter and fixed errors | Unintended mutation and raw response leakage |
-| Intent generations and host setting subscription | Out-of-order focus, config and board completion |
-| Qualified refs and opaque focus identity | Cross-team routing and stale workspace selection |
+| Request generations and host setting subscription | Out-of-order connection and board completion |
+| Exact qualified ref and no focus event handling | Cross-team routing ambiguity and event-order races |
 | Cap indicator and listed-only progress | Misrepresenting partial results as the complete board |
 
 ## Risks / Trade-offs

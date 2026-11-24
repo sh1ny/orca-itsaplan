@@ -1,10 +1,9 @@
-import { createHash, createHmac, randomBytes } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import { normalizeBase, URL_SETTING } from './connection.mjs';
 import { tracker, TrackerError } from './tracker.mjs';
 
 const SECRET = 'connection';
 const fail = (code) => { throw new TrackerError(code); };
-const digest = (parts) => createHash('sha256').update(JSON.stringify(parts)).digest('hex');
 const validKey = (key) => typeof key === 'string' && /^[!-~]{1,4096}$/.test(key);
 
 function readLane() {
@@ -86,15 +85,9 @@ export default function activate(orca, requestOptions) {
     return tracker(url, saved.key, requestOptions);
   }
 
-  register('focus.read', async () => {
+  register('workspace.snapshot', async () => {
     const context = await orca.host.call('workspace.readContext');
-    if (!context) return null;
-    const id = context.workspaceId;
-    return {
-      name: context.displayName,
-      token: id ? digest(id) : null,
-      eventId: id && /^(identity|folder):/.test(id) ? id : null,
-    };
+    return context?.workspaceId ? context.displayName?.trim() || null : null;
   });
 
   register('connection.save', (input) => writeCredential(async () => {

@@ -54,29 +54,25 @@ The plugin SHALL initiate tracker reads only for an open sidebar. The sidebar SH
 - **WHEN** an initiative page reports more matches than returned rows, or the unpaginated issue or project result reaches its projection cap
 - **THEN** the panel marks the corresponding result potentially incomplete
 
-### Requirement: Follow a focused workspace
-The panel SHALL follow Orca’s focused workspace. A manually selected tracker project lasts until focus changes; no per-workspace selection is saved or restored. The panel SHALL NOT infer a tracker project by repository name.
+### Requirement: Workspace project snapshot
+The panel SHALL check Orca’s open workspace only on open and Refresh, with no workspace or focus subscription. A unique, exact team-qualified project reference in the workspace display name selects that project. A hand pick lasts until a successful workspace check and is never saved per workspace. Failed checks SHALL show an explicit manual-picker state and SHALL NOT present a previous automatic board as current.
 
-#### Scenario: Switch workspace and return
-- **WHEN** a user picks a project, switches to another workspace, and returns
-- **THEN** the panel clears the selection and does not restore it; an old board response cannot redraw it
+#### Scenario: Open on a named workspace
+- **WHEN** the panel opens on a workspace named for one accessible project’s exact qualified reference
+- **THEN** the panel shows that project after the workspace and project reads both resolve
 
-#### Scenario: Refresh the displayed view
-- **WHEN** the user presses Refresh
-- **THEN** the panel reloads the selected project board if focus is unchanged, or the picker when there is no current selection
+#### Scenario: Refresh resolves a workspace
+- **WHEN** Refresh resolves an identifiable workspace after a hand pick
+- **THEN** the hand pick ends and the panel shows the project matching the new snapshot, if any
 
-#### Scenario: Focus changes before its event arrives
-- **WHEN** Refresh detects a different current workspace before Orca delivers the notification
-- **THEN** the panel clears the selection and does not request the previous board
+#### Scenario: Workspace check fails
+- **WHEN** Orca cannot identify the open workspace or the check fails
+- **THEN** the panel asks the user to pick a project, retains any hand pick as manual, and does not show an old board as the workspace’s project
 
-#### Scenario: Workspace event without a public identifier
-- **WHEN** an Orca event omits the public workspace identifier
-- **THEN** the panel rechecks focus and keeps the selection if the resolved identity did not change
+#### Scenario: Workspace name does not match
+- **WHEN** the workspace is identified but its name is not an exact unique qualified reference in the accessible list
+- **THEN** the manual picker remains available without guessing a project
 
 #### Scenario: Tracker route reused during a board load
 - **WHEN** the tracker issues read succeeds but the scaffold identifies a replacement project under the same ref
 - **THEN** the board load is refused and no issue from either project is rendered under that selection
-
-#### Scenario: No reliable workspace identity
-- **WHEN** Orca does not expose a focused workspace’s identity
-- **THEN** the project picker remains usable without guessing or editing the workspace

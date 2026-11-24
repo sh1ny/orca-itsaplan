@@ -5,9 +5,7 @@ import { createPanel } from '../src/panel-state.mjs';
 const base = 'https://plan.example.test';
 const projects = [{ id: 1, ref: 'team.ONE' }, { id: 2, ref: 'team.TWO' }];
 const ok = (value) => ({ ok: true, value });
-const focused = (token, eventId = `identity:${token}`) => ok({ token, eventId, name: `Workspace ${token}` });
 const catalog = (rows = projects) => ok({ projects: rows, partial: false });
-const change = (workspaceId) => ({ context: { workspaceId } });
 
 function harness(url = base) {
   const calls = [];
@@ -45,7 +43,7 @@ function harness(url = base) {
 
 async function start(h) {
   const open = h.panel.open();
-  const focus = await h.next('focus.read');
+  const focus = await h.next('workspace.snapshot');
   const list = await h.next('projects.list');
   return { open, focus, list };
 }
@@ -63,7 +61,7 @@ test('key save recovers missing credentials', async () => {
   assert.equal(save.input.base, base);
   assert.ok(h.draftClears > count);
   save.finish(ok(null));
-  assert.equal(h.calls.filter(({ name }) => name === 'focus.read').length, 1);
+  assert.equal(h.calls.filter(({ name }) => name === 'workspace.snapshot').length, 1);
   (await h.next('projects.list')).finish(catalog());
   await saving;
   assert.deepEqual(h.state.catalog.projects, projects);
@@ -115,117 +113,117 @@ test('closed panel cannot start tracker reads', async () => {
   h.panel.close();
   assert.equal(list.signal.aborted, true);
   list.finish(catalog());
-  focus.finish(focused('a'));
+  focus.finish(ok('team.ONE'));
   await open;
   await h.panel.urlChanged();
-  await h.panel.workspaceChanged(change('identity:other'));
   await h.panel.refresh();
-  assert.deepEqual(h.calls.map(({ name }) => name), ['focus.read', 'projects.list']);
+  assert.deepEqual(h.calls.map(({ name }) => name), ['workspace.snapshot', 'projects.list']);
 });
 
-async function openPicker(h, workspace = focused('a')) {
+async function finishBoard(h, id, content) {
+  const request = await h.next('board.read');
+  assert.equal(request.input.project.id, id);
+  request.finish(ok(content));
+  return request;
+}
+
+async function openProject(h) {
   const { open, focus, list } = await start(h);
-  focus.finish(workspace);
+  focus.finish(ok('team.ONE'));
   list.finish(catalog());
+  await finishBoard(h, 1, 'Workspace board');
   await open;
 }
 
-async function pick(h, id) {
-  const choosing = h.panel.pick(id);
-  const read = await h.next('board.read');
-  assert.equal(read.input.project.id, id);
-  read.finish(ok(`Board ${id}`));
-  await choosing;
+async function refresh(h, workspace) {
+  const done = h.panel.refresh();
+  const snapshot = await h.next('workspace.snapshot');
+  const list = await h.next('projects.list');
+  snapshot.finish(workspace);
+  list.finish(catalog());
+  return { done };
 }
 
-test('switching workspaces clears the choice and does not remember it on return', async () => {
-  const h = harness();
-  await openPicker(h);
-  const choosing = h.panel.pick(2);
-  const stale = await h.next('board.read');
-  const away = h.panel.workspaceChanged(change('identity:b'));
-  assert.equal(stale.signal.aborted, true);
-  assert.equal(h.state.selected, null);
-  const awayRead = await h.next('focus.read');
-  const back = h.panel.workspaceChanged(change('identity:a'));
-  (await h.next('focus.read')).finish(focused('a'));
-  await back;
-  awayRead.finish(focused('b'));
-  stale.finish(ok('Stale board'));
-  await Promise.all([away, choosing]);
-  assert.equal(h.state.focus.name, 'Workspace a');
-  assert.equal(h.state.selected, null);
-  assert.equal(h.state.board, null);
-  assert.equal(h.calls.filter(({ name }) => name === 'board.read').length, 1);
+test('opening shows an exact workspace project after both reads complete', async () => {
+  for (const workspaceFirst of [false, true]) {
+    const h = harness();
+    const { open, focus, list } = await start(h);
+    if (workspaceFirst) focus.finish(ok('team.ONE'));
+    else list.finish(catalog());
+    assert.equal(h.state.board, null);
+    if (workspaceFirst) list.finish(catalog());
+    else focus.finish(ok('team.ONE'));
+    await finishBoard(h, 1, 'Workspace board');
+    await open;
+    assert.equal(h.state.workspace, 'team.ONE');
+    assert.equal(h.state.board, 'Workspace board');
+    assert.equal(h.calls.filter(({ name }) => name === 'workspace.snapshot').length, 1);
+  }
 });
 
-test('refresh reloads the displayed board without reloading the picker', async () => {
+test('a successful Refresh replaces a hand pick with the freshly resolved workspace project', async () => {
   const h = harness();
-  await openPicker(h);
-  await pick(h, 2);
-  const refresh = h.panel.refresh();
-  (await h.next('focus.read')).finish(focused('a'));
-  const board = await h.next('board.read');
-  assert.equal(board.input.project.id, 2);
-  board.finish(ok('Updated board'));
-  await refresh;
-  assert.equal(h.state.board, 'Updated board');
-  assert.equal(h.calls.filter(({ name }) => name === 'projects.list').length, 1);
-});
+  await openProject(h);
+  const chosen = h.panel.pick(2);
+  await finishBoard(h, 2, 'Hand pick');
+  await chosen;
+  assert.equal(h.state.board, 'Hand pick');
+  assert.equal(h.calls.filter(({ name }) => name === 'workspace.snapshot').length, 1);
 
-test('refresh does not reload the old board if the worker sees focus move first', async () => {
-  const h = harness();
-  await openPicker(h);
-  await pick(h, 2);
-  const refresh = h.panel.refresh();
-  (await h.next('focus.read')).finish(focused('b'));
-  (await h.next('projects.list')).finish(catalog());
-  await refresh;
-  assert.equal(h.state.selected, null);
-  assert.equal(h.state.board, null);
-  assert.equal(h.calls.filter(({ name }) => name === 'board.read').length, 1);
-});
+  const { done } = await refresh(h, ok('team.ONE'));
+  await finishBoard(h, 1, 'Refreshed workspace board');
+  await done;
+  assert.equal(h.state.selected, 1);
+  assert.equal(h.state.board, 'Refreshed workspace board');
 
-test('an ID-less event rechecks focus without discarding a choice in the same workspace', async () => {
-  const h = harness();
-  await openPicker(h, focused('a', null));
-  await pick(h, 1);
-  const refreshing = h.panel.refresh();
-  const refreshRead = await h.next('focus.read');
-  const terminalChanged = h.panel.workspaceChanged(change(undefined));
-  (await h.next('focus.read')).finish(focused('a', null));
-  await terminalChanged;
-  refreshRead.finish(focused('a', null));
-  const board = await h.next('board.read');
-  assert.equal(board.input.project.id, 1);
-  board.finish(ok('Updated board'));
-  await refreshing;
-  assert.equal(h.state.board, 'Updated board');
-
-  const switched = h.panel.workspaceChanged(change(undefined));
-  (await h.next('focus.read')).finish(focused('b', null));
+  const { done: switched } = await refresh(h, ok('team.TWO'));
+  await finishBoard(h, 2, 'Other workspace board');
   await switched;
-  assert.equal(h.state.selected, null);
-  assert.equal(h.state.board, null);
+  assert.equal(h.state.workspace, 'team.TWO');
+  assert.equal(h.state.board, 'Other workspace board');
 });
 
-test('no workspace identity still permits manual selection and catalog refresh', async () => {
+test('failed workspace check retains a hand pick as manual and ignores the old board reply', async () => {
+  const h = harness();
+  await openProject(h);
+  const choosing = h.panel.pick(2);
+  const oldRead = await h.next('board.read');
+  const { done } = await refresh(h, { ok: false, code: 'host' });
+  assert.equal(oldRead.signal.aborted, true);
+  assert.equal(h.state.workspace, null);
+  assert.equal(h.state.board, null);
+  await finishBoard(h, 2, 'New manual board');
+  await done;
+  oldRead.finish(ok('Stale board'));
+  await choosing;
+  assert.equal(h.state.workspace, null);
+  assert.equal(h.state.selected, 2);
+  assert.equal(h.state.board, 'New manual board');
+});
+
+test('failed workspace check never refreshes the previous automatic board', async () => {
+  const h = harness();
+  await openProject(h);
+  const { done } = await refresh(h, { ok: false, code: 'host' });
+  await done;
+  assert.equal(h.state.workspace, null);
+  assert.equal(h.state.selected, null);
+  assert.equal(h.state.board, null);
+  assert.equal(h.calls.filter(({ name }) => name === 'board.read').length, 1);
+  const picking = h.panel.pick(2);
+  await finishBoard(h, 2, 'Manual board after failure');
+  await picking;
+  assert.equal(h.state.board, 'Manual board after failure');
+});
+
+test('an unmatched workspace name does not guess a tracker project', async () => {
   const h = harness();
   const { open, focus, list } = await start(h);
+  focus.finish(ok('ONE'));
   list.finish(catalog());
   await open;
-  assert.equal(h.state.checkingFocus, true);
-  await h.panel.pick(2);
+  assert.equal(h.state.workspace, 'ONE');
+  assert.equal(h.state.selected, null);
+  assert.deepEqual(h.state.catalog.projects, projects);
   assert.equal(h.calls.length, 2);
-  const recheck = h.panel.workspaceChanged(change(undefined));
-  (await h.next('focus.read')).finish(ok(null));
-  focus.finish(ok(null));
-  await recheck;
-  await pick(h, 2);
-  assert.equal(h.state.board, 'Board 2');
-  await h.panel.pick(null);
-  const refreshing = h.panel.refresh();
-  (await h.next('projects.list')).finish(catalog([projects[0]]));
-  await refreshing;
-  assert.deepEqual(h.state.catalog.projects, [projects[0]]);
 });

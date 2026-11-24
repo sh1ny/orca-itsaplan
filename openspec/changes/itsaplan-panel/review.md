@@ -59,6 +59,16 @@ The owner superseded the remembered-mapping scope: “the panel follows the focu
 
 One OMP pre-ship review is authorized on the reduced scope. A blocker stops shipment; no waiver or additional round is authorized.
 
+## Owner scope decision (snapshot-only; F10, F13, F14)
+
+The owner dropped live following. The sidebar subscribes to no workspace or focus events and reads the open workspace only when opened or explicitly refreshed. A resolved workspace replaces the hand pick; a failed check keeps it manual and no longer represents any previous automatic board as current.
+
+- **F10 — resolved by scope change.** Workspace round trips between checks are not observed and cannot trigger preservation or restoration logic.
+- **F13 — resolved by scope change.** No workspace notifications are delivered to the sidebar; a late event cannot clear a hand pick.
+- **F14 — resolved by scope change.** A failed snapshot clears the prior automatic project and renders a manual-picker state. Only a hand pick can be reloaded, explicitly as manual.
+
+One OMP pre-ship review is authorized on the snapshot-only scope. No additional round or waiver was authorized.
+
 
 <!-- specwright-design-progress -->
 <!-- eyJ2ZXJzaW9uIjoxLCJyb3VuZCI6Mywic2NvcGVfcm91bmQiOjMsImV4dGVuZGVkIjpmYWxzZSwibG9nIjpbeyJyb3VuZCI6MiwicmVwYWlycyI6IkJpbmQgZHJhZnQgY3JlZGVudGlhbHMgdG8gdmlzaWJsZSBiYXNlOyBpbnZhbGlkYXRlIHN0YWxlIGZvY3VzIGFuZCBzZXR0aW5ncyB3b3JrOyBib3VuZCBsaXZlIHJlYWRzOyBjbGFyaWZ5IGNvbnRyYWN0cyBhbmQgZXhjbHVzaW9ucyJ9LHsicm91bmQiOjMsInJlcGFpcnMiOiJNYWtlIHRoZSBsaXN0IGEgcHJlcmVxdWlzaXRlOyBpc29sYXRlIGxhbmUgb3duZXJzaGlwIGJ5IHNlc3Npb247IHBlcnNpc3QgdHJhY2tlciBpZHM7IHRpZ2h0ZW4gc2NlbmFyaW9zIGFuZCBob3N0IGNpdGF0aW9ucyJ9XX0= -->
