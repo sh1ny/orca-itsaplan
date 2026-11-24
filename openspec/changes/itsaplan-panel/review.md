@@ -77,6 +77,17 @@ The owner authorized fixes for F15–F17 only: preserve exact workspace matching
 - **F16:** Scope a hand pick to the normalized API base, not the spelling of the setting.
 - **F17:** Wait for the catalog to render before resolving the workspace snapshot; verify that no read for the old hand pick started.
 
+### Final pre-ship disposition
+
+The OMP review of `36ee460f31` confirmed F15–F17 fixed. The owner accepted F19–F23 as follow-ups; no code changes were made after that review.
+
+- **F18 — shipment blocked:** [#1](https://github.com/sh1ny/orca-itsaplan/issues/1). Although the plugin sends only GETs, the reviewed Itsaplan build can create a workspace or team during authentication. This meets the owner's no-tracker-writes stop condition. The change was not archived and no PR was opened.
+- **F19 — follow-up:** [#2](https://github.com/sh1ny/orca-itsaplan/issues/2). An equivalent URL edit during credential save can leave the picker stale until Refresh.
+- **F20 — follow-up:** [#3](https://github.com/sh1ny/orca-itsaplan/issues/3). Document that the sidebar requires Orca's default isolated desktop frame mode.
+- **F21 — follow-up:** [#4](https://github.com/sh1ny/orca-itsaplan/issues/4). Document that a personal API key retains the account's authority.
+- **F22 — follow-up:** [#5](https://github.com/sh1ny/orca-itsaplan/issues/5). Align the Node version guidance with the pinned pnpm version.
+- **F23 — follow-up:** [#6](https://github.com/sh1ny/orca-itsaplan/issues/6). Record the disposition of concrete findings separately from reviewer instructions.
+
 
 <!-- specwright-design-progress -->
 <!-- eyJ2ZXJzaW9uIjoxLCJyb3VuZCI6Mywic2NvcGVfcm91bmQiOjMsImV4dGVuZGVkIjpmYWxzZSwibG9nIjpbeyJyb3VuZCI6MiwicmVwYWlycyI6IkJpbmQgZHJhZnQgY3JlZGVudGlhbHMgdG8gdmlzaWJsZSBiYXNlOyBpbnZhbGlkYXRlIHN0YWxlIGZvY3VzIGFuZCBzZXR0aW5ncyB3b3JrOyBib3VuZCBsaXZlIHJlYWRzOyBjbGFyaWZ5IGNvbnRyYWN0cyBhbmQgZXhjbHVzaW9ucyJ9LHsicm91bmQiOjMsInJlcGFpcnMiOiJNYWtlIHRoZSBsaXN0IGEgcHJlcmVxdWlzaXRlOyBpc29sYXRlIGxhbmUgb3duZXJzaGlwIGJ5IHNlc3Npb247IHBlcnNpc3QgdHJhY2tlciBpZHM7IHRpZ2h0ZW4gc2NlbmFyaW9zIGFuZCBob3N0IGNpdGF0aW9ucyJ9XX0= -->
