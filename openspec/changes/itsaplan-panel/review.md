@@ -45,6 +45,10 @@ Owner decision: “make only the three required edits … No further design-revi
 
 The three requested edits are in the design and delta spec. The owner authorized proceeding without the reviewer’s separate confirmation; the round-3 reviewer verdict and `CHANGES_APPLIED` marker above are unchanged. This is an explicit owner exception to the confirmation gate, not a new reviewer approval or a waiver of the pre-ship review.
 
+## Owner checkpoint (pre-ship, after two fix rounds)
+
+The owner authorized one additional pre-ship fix round for F10: invalidate the preserved manual choice on a real focus change, test both A→B→A during Refresh and Refresh before focus resolves without real-time waits, and rerun the OMP pre-ship review. Ship only if that review passes; no waiver or further round was authorized.
+
 
 <!-- specwright-design-progress -->
 <!-- eyJ2ZXJzaW9uIjoxLCJyb3VuZCI6Mywic2NvcGVfcm91bmQiOjMsImV4dGVuZGVkIjpmYWxzZSwibG9nIjpbeyJyb3VuZCI6MiwicmVwYWlycyI6IkJpbmQgZHJhZnQgY3JlZGVudGlhbHMgdG8gdmlzaWJsZSBiYXNlOyBpbnZhbGlkYXRlIHN0YWxlIGZvY3VzIGFuZCBzZXR0aW5ncyB3b3JrOyBib3VuZCBsaXZlIHJlYWRzOyBjbGFyaWZ5IGNvbnRyYWN0cyBhbmQgZXhjbHVzaW9ucyJ9LHsicm91bmQiOjMsInJlcGFpcnMiOiJNYWtlIHRoZSBsaXN0IGEgcHJlcmVxdWlzaXRlOyBpc29sYXRlIGxhbmUgb3duZXJzaGlwIGJ5IHNlc3Npb247IHBlcnNpc3QgdHJhY2tlciBpZHM7IHRpZ2h0ZW4gc2NlbmFyaW9zIGFuZCBob3N0IGNpdGF0aW9ucyJ9XX0= -->

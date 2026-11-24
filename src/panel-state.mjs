@@ -10,7 +10,7 @@ export function createPanel({ readSetting, request, render, clearDraft }) {
   let focusGeneration = 0;
   let manualGeneration = 0;
   let fallback = null;
-  let preservedFocus;
+  let preserveSelection = false;
   let focusPending = false;
   let observedId;
   let catalogRequest;
@@ -48,11 +48,10 @@ export function createPanel({ readSetting, request, render, clearDraft }) {
   function reconcile() {
     if (state.catalog && !focusPending) {
       const mapped = state.focus?.mappedId;
-      const sameFocus = preservedFocus === (state.focus?.token ?? null);
-      const useFallback = sameFocus && state.catalog.projects.some(({ id }) => id === fallback);
-      preservedFocus = undefined;
+      const keepSelection = preserveSelection && state.catalog.projects.some(({ id }) => id === fallback);
+      preserveSelection = false;
       const hasMapping = state.catalog.projects.some(({ id }) => id === mapped);
-      void board(useFallback || !hasMapping ? fallback : mapped);
+      void board(keepSelection || !hasMapping ? fallback : mapped);
     }
   }
 
@@ -86,7 +85,7 @@ export function createPanel({ readSetting, request, render, clearDraft }) {
     focusPending = false;
     clearBoard();
     const oldBase = state.base;
-    preservedFocus = !reset && state.selected !== null ? (state.focus?.token ?? null) : undefined;
+    preserveSelection = !reset && state.selected !== null;
     fallback = reset ? null : (state.selected ?? fallback);
     Object.assign(state, {
       base: null, catalog: null, selected: null, focus: null, catalogStatus: 'loading',
@@ -102,7 +101,10 @@ export function createPanel({ readSetting, request, render, clearDraft }) {
     }
     if (generation !== connectionGeneration || disposed) return;
     state.base = normalizeBase(value);
-    if (oldBase !== state.base) fallback = null;
+    if (oldBase !== state.base) {
+      preserveSelection = false;
+      fallback = null;
+    }
     if (!state.base) { state.catalogStatus = 'invalid_url'; draw(); return; }
     void focus();
     const result = await call('projects.list', { base: state.base }, { signal: controller.signal });
@@ -137,6 +139,7 @@ export function createPanel({ readSetting, request, render, clearDraft }) {
       const next = context?.workspaceId;
       if (next && next === observedId) return;
       observedId = next;
+      preserveSelection = false;
       return focus();
     },
     pick(id) {

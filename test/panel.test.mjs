@@ -215,3 +215,57 @@ test('refresh preserves a manual selection in the same focused workspace', async
   await refreshing;
   assert.equal(request.input.project.id, 2);
 });
+
+test('returning to a mapped workspace during refresh drops the manual override', async () => {
+  const h = harness();
+  await h.panel.workspaceChanged(change('identity:a'));
+  const { open, focus, list } = await start(h);
+  focus.finish(mapped(1));
+  list.finish(catalog());
+  (await h.next('board.read')).finish(ok('Remembered A'));
+  await open;
+  const choosing = h.panel.pick(2);
+  (await h.next('board.read')).finish(ok('Manual B'));
+  await choosing;
+
+  const refreshing = h.panel.refresh();
+  const refreshFocus = await h.next('focus.read');
+  const pendingList = await h.next('projects.list');
+  const away = h.panel.workspaceChanged(change('identity:b'));
+  const awayFocus = await h.next('focus.read');
+  const back = h.panel.workspaceChanged(change('identity:a'));
+  const backFocus = await h.next('focus.read');
+  backFocus.finish(mapped(1));
+  await back;
+  awayFocus.finish(mapped(2));
+  await away;
+  refreshFocus.finish(mapped(1));
+  pendingList.finish(catalog());
+  const board = await h.next('board.read');
+  board.finish(ok('Remembered A again'));
+  await refreshing;
+  assert.equal(board.input.project.id, 1);
+});
+
+test('refresh retains a manual choice made before focus first resolves', async () => {
+  const h = harness();
+  await h.panel.workspaceChanged(change('identity:a'));
+  const { open, focus, list } = await start(h);
+  list.finish(catalog());
+  await open;
+  const choosing = h.panel.pick(2);
+  (await h.next('board.read')).finish(ok('Manual B'));
+  await choosing;
+
+  const refreshing = h.panel.refresh();
+  const refreshFocus = await h.next('focus.read');
+  const pendingList = await h.next('projects.list');
+  await h.panel.workspaceChanged(change('identity:a')); // Terminal change, not a new focus.
+  focus.finish(mapped(1));
+  pendingList.finish(catalog());
+  await refreshing;
+  refreshFocus.finish(mapped(1));
+  const board = await h.next('board.read');
+  board.finish(ok('Refreshed B'));
+  assert.equal(board.input.project.id, 2);
+});

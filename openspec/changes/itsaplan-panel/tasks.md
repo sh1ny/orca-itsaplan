@@ -16,11 +16,11 @@
 | Project board summary | Grouped board with subtasks | test/worker.test.mjs | projects only bounded board data and counts listed children | green |
 | Project board summary | Unavailable initiatives and missing column | test/worker.test.mjs | optional initiatives do not hide unknown-column issues | green |
 | Project board summary | Partial board | test/worker.test.mjs | reports partial board and catalog results | green |
-| Follow a focused workspace | Switch between mapped projects | test/panel.test.mjs | mapped focus supersedes stale board replies | green |
+| Follow a focused workspace | Switch between mapped projects | test/panel.test.mjs | mapped focus supersedes stale board replies; returning to a mapped workspace during refresh drops the manual override | green |
 | Follow a focused workspace | Focus and project list resolve in either order | test/panel.test.mjs | focus and project list complete in either order | green |
 | Follow a focused workspace | Reused tracker route | test/panel.test.mjs | a replacement project does not inherit a mapping | green |
 | Follow a focused workspace | Tracker route reused during a board load | test/worker.test.mjs | rejects replacement scaffold after issue read | green |
-| Follow a focused workspace | Manual choice during focus lookup | test/panel.test.mjs | manual selection wins a pending focus lookup | green |
+| Follow a focused workspace | Manual choice during focus lookup | test/panel.test.mjs | manual selection wins a pending focus lookup; refresh retains a manual choice made before focus first resolves | green |
 | Follow a focused workspace | No reliable repository identity | test/worker.test.mjs | ambiguous or absent workspace metadata falls back to manual | green |
 
 ## 1. Read-only sidebar
