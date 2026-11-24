@@ -14,6 +14,7 @@ function harness(url = base) {
   let state;
   let draftClears = 0;
   let draft = '';
+  let onRender;
   const panel = createPanel({
     readSetting: async () => url,
     request(name, input, { signal }) {
@@ -24,7 +25,7 @@ function harness(url = base) {
       else queue.push(call);
       return d.promise;
     },
-    render: (value) => { state = { ...value }; },
+    render: (value) => { state = { ...value }; onRender?.(state); },
     clearDraft: () => { draft = ''; draftClears++; },
   });
   return {
@@ -33,6 +34,16 @@ function harness(url = base) {
     get draftClears() { return draftClears; },
     setDraft(value) { draft = value; },
     get draft() { return draft; },
+    whenRendered(predicate) {
+      const done = Promise.withResolvers();
+      onRender = (value) => {
+        if (!predicate(value)) return;
+        onRender = undefined;
+        done.resolve();
+      };
+      if (state) onRender(state);
+      return done.promise;
+    },
     async next(name) {
       const call = queue.shift() ?? await new Promise((resolve) => waiters.push(resolve));
       assert.equal(call.name, name);
@@ -135,6 +146,30 @@ async function openProject(h) {
   await open;
 }
 
+test('equivalent URL edits keep the hand pick and a different base does not reuse it', async () => {
+  const h = harness();
+  await openProject(h);
+  const chosen = h.panel.pick(2);
+  await finishBoard(h, 2, 'Hand pick');
+  await chosen;
+
+  for (const [url, expectedBase, id] of [
+    ['https://PLAN.example.test/', base, 2],
+    ['https://other.example.test', 'https://other.example.test', 1],
+  ]) {
+    h.setUrl(url);
+    const changed = h.panel.urlChanged();
+    const list = await h.next('projects.list');
+    assert.equal(list.input.base, expectedBase);
+    list.finish(catalog());
+    const request = await finishBoard(h, id, `Board from ${expectedBase}`);
+    assert.equal(request.input.base, expectedBase);
+    await changed;
+    assert.equal(h.state.selected, id);
+  }
+  assert.equal(h.calls.filter(({ name }) => name === 'workspace.snapshot').length, 1);
+});
+
 async function refresh(h, workspace) {
   const done = h.panel.refresh();
   const snapshot = await h.next('workspace.snapshot');
@@ -170,7 +205,17 @@ test('a successful Refresh replaces a hand pick with the freshly resolved worksp
   assert.equal(h.state.board, 'Hand pick');
   assert.equal(h.calls.filter(({ name }) => name === 'workspace.snapshot').length, 1);
 
-  const { done } = await refresh(h, ok('team.ONE'));
+  const done = h.panel.refresh();
+  const snapshot = await h.next('workspace.snapshot');
+  const list = await h.next('projects.list');
+  const listApplied = h.whenRendered(({ catalog }) => catalog !== null);
+  list.finish(catalog());
+  await listApplied;
+  assert.equal(h.state.checkingWorkspace, true);
+  assert.equal(h.state.selected, null);
+  assert.equal(h.state.board, null);
+  assert.equal(h.calls.at(-1), list, 'catalog-first Refresh must not request the old hand pick');
+  snapshot.finish(ok('team.ONE'));
   await finishBoard(h, 1, 'Refreshed workspace board');
   await done;
   assert.equal(h.state.selected, 1);
@@ -217,13 +262,15 @@ test('failed workspace check never refreshes the previous automatic board', asyn
 });
 
 test('an unmatched workspace name does not guess a tracker project', async () => {
-  const h = harness();
-  const { open, focus, list } = await start(h);
-  focus.finish(ok('ONE'));
-  list.finish(catalog());
-  await open;
-  assert.equal(h.state.workspace, 'ONE');
-  assert.equal(h.state.selected, null);
-  assert.deepEqual(h.state.catalog.projects, projects);
-  assert.equal(h.calls.length, 2);
+  for (const name of ['ONE', ' team.ONE', 'team.ONE ', 'team.one']) {
+    const h = harness();
+    const { open, focus, list } = await start(h);
+    focus.finish(ok(name));
+    list.finish(catalog());
+    await open;
+    assert.equal(h.state.workspace, name);
+    assert.equal(h.state.selected, null);
+    assert.deepEqual(h.state.catalog.projects, projects);
+    assert.equal(h.calls.length, 2);
+  }
 });

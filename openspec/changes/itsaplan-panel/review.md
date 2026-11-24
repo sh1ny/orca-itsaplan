@@ -69,6 +69,14 @@ The owner dropped live following. The sidebar subscribes to no workspace or focu
 
 One OMP pre-ship review is authorized on the snapshot-only scope. No additional round or waiver was authorized.
 
+## Owner decision (final pre-ship round)
+
+The owner authorized fixes for F15–F17 only: preserve exact workspace matching, keep the hand pick across equivalent URLs, and test a catalog-first Refresh without clock waits. Run one final OMP review. File new findings as follow-ups without fixing them here, except that any tracker write, key leak or panel-breaking finding blocks shipment.
+
+- **F15:** Trim only to detect a blank name; do not remove whitespace or fold case from the name compared to a project ref.
+- **F16:** Scope a hand pick to the normalized API base, not the spelling of the setting.
+- **F17:** Wait for the catalog to render before resolving the workspace snapshot; verify that no read for the old hand pick started.
+
 
 <!-- specwright-design-progress -->
 <!-- eyJ2ZXJzaW9uIjoxLCJyb3VuZCI6Mywic2NvcGVfcm91bmQiOjMsImV4dGVuZGVkIjpmYWxzZSwibG9nIjpbeyJyb3VuZCI6MiwicmVwYWlycyI6IkJpbmQgZHJhZnQgY3JlZGVudGlhbHMgdG8gdmlzaWJsZSBiYXNlOyBpbnZhbGlkYXRlIHN0YWxlIGZvY3VzIGFuZCBzZXR0aW5ncyB3b3JrOyBib3VuZCBsaXZlIHJlYWRzOyBjbGFyaWZ5IGNvbnRyYWN0cyBhbmQgZXhjbHVzaW9ucyJ9LHsicm91bmQiOjMsInJlcGFpcnMiOiJNYWtlIHRoZSBsaXN0IGEgcHJlcmVxdWlzaXRlOyBpc29sYXRlIGxhbmUgb3duZXJzaGlwIGJ5IHNlc3Npb247IHBlcnNpc3QgdHJhY2tlciBpZHM7IHRpZ2h0ZW4gc2NlbmFyaW9zIGFuZCBob3N0IGNpdGF0aW9ucyJ9XX0= -->

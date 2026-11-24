@@ -42,7 +42,7 @@ export function createPanel({ readSetting, request, render, clearDraft }) {
 
   function reconcile() {
     if (state.checkingWorkspace || !state.catalog) return;
-    if (manualChoice !== undefined) return board(manualChoice);
+    if (manualChoice) return board(manualChoice.id);
     const matches = state.catalog.projects.filter(({ ref }) => ref === state.workspace);
     return board(matches.length === 1 ? matches[0].id : null);
   }
@@ -87,6 +87,7 @@ export function createPanel({ readSetting, request, render, clearDraft }) {
     }
     if (generation !== connectionGeneration || disposed) return;
     state.base = normalizeBase(value);
+    if (manualChoice && manualChoice.base !== state.base) manualChoice = undefined;
     if (!state.base) { state.catalogStatus = 'invalid_url'; draw(); return; }
     const result = await call('projects.list', { base: state.base }, { signal: controller.signal });
     if (generation !== connectionGeneration || disposed) return;
@@ -121,13 +122,10 @@ export function createPanel({ readSetting, request, render, clearDraft }) {
       if (disposed || state.saving || state.checkingWorkspace || state.catalogStatus === 'loading') return;
       return reload();
     },
-    urlChanged() {
-      manualChoice = undefined;
-      return loadCatalog();
-    },
+    urlChanged: loadCatalog,
     pick(id) {
       if (disposed || !state.catalog || state.checkingWorkspace) return;
-      manualChoice = id;
+      manualChoice = { base: state.base, id };
       return board(id);
     },
     saveKey: (key) => credential('connection.save', key),

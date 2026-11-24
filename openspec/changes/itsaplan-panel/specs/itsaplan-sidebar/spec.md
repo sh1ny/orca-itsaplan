@@ -55,7 +55,7 @@ The plugin SHALL initiate tracker reads only for an open sidebar. The sidebar SH
 - **THEN** the panel marks the corresponding result potentially incomplete
 
 ### Requirement: Workspace project snapshot
-The panel SHALL check Orca’s open workspace only on open and Refresh, with no workspace or focus subscription. A unique, exact team-qualified project reference in the workspace display name selects that project. A hand pick lasts until a successful workspace check and is never saved per workspace. Failed checks SHALL show an explicit manual-picker state and SHALL NOT present a previous automatic board as current.
+The panel SHALL read Orca’s workspace only on open and Refresh and SHALL NOT subscribe to workspace events. It selects a unique exact team-qualified match for the workspace name, preserving case and whitespace. A hand pick lasts until a successful workspace check or a change of normalized API base and is not saved per workspace. Failed checks SHALL prompt for a hand pick without showing a previous automatic board as current.
 
 #### Scenario: Open on a named workspace
 - **WHEN** the panel opens on a workspace named for one accessible project’s exact qualified reference
@@ -64,6 +64,10 @@ The panel SHALL check Orca’s open workspace only on open and Refresh, with no 
 #### Scenario: Refresh resolves a workspace
 - **WHEN** Refresh resolves an identifiable workspace after a hand pick
 - **THEN** the hand pick ends and the panel shows the project matching the new snapshot, if any
+
+#### Scenario: Equivalent API URL edit
+- **WHEN** the API URL changes spelling but normalizes to the same base
+- **THEN** the hand pick remains selected after the catalog reload, with no new workspace check
 
 #### Scenario: Workspace check fails
 - **WHEN** Orca cannot identify the open workspace or the check fails

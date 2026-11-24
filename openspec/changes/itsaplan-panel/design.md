@@ -105,7 +105,7 @@ Opening or refreshing the panel makes one workspace host call, one project-list 
 
 ## Flow & State Gaps (FULL)
 
-Only open and Refresh request a workspace snapshot. Start the snapshot and catalog reads together and abort the old board before either resolves. Select a board only after both are ready. A successful workspace check discards any hand pick, even without a matching tracker ref; a failed check uses only the hand pick and labels it manual. Ignore cancelled board replies. URL changes clear the draft, list and board and never trigger a new workspace snapshot.
+Only open and Refresh request a workspace snapshot. Start the snapshot and catalog reads together and abort the old board before either resolves. Select a board only after both are ready. A successful workspace check discards any hand pick, even without a matching tracker ref; a failed check uses only the hand pick and labels it manual. Ignore cancelled board replies. URL edits clear the draft, list and board and never trigger a workspace snapshot. Keep a hand pick when the URL normalizes to the same API base.
 
 Successful key save for the current base invalidates prior connection results and starts a fresh list through the same list-before-board path, including recovery from missing-key errors. A save completion superseded by a URL edit or panel disposal cannot refresh the obsolete connection.
 

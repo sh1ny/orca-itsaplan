@@ -18,6 +18,7 @@
 | Project board summary | Partial board | test/worker.test.mjs | reports partial board and catalog results | green |
 | Workspace project snapshot | Open on a named workspace | test/panel.test.mjs | opening shows an exact workspace project after both reads complete | green |
 | Workspace project snapshot | Refresh resolves a workspace | test/panel.test.mjs | a successful Refresh replaces a hand pick with the freshly resolved workspace project | green |
+| Workspace project snapshot | Equivalent API URL edit | test/panel.test.mjs | equivalent URL edits keep the hand pick and a different base does not reuse it | green |
 | Workspace project snapshot | Workspace check fails | test/panel.test.mjs; test/worker.test.mjs | failed workspace check retains a hand pick as manual and ignores the old board reply; failed workspace check never refreshes the previous automatic board; workspace snapshot exposes only the identifiable workspace display name | green |
 | Workspace project snapshot | Workspace name does not match | test/panel.test.mjs | an unmatched workspace name does not guess a tracker project | green |
 | Workspace project snapshot | Tracker route reused during a board load | test/worker.test.mjs | rejects replacement scaffold after issue read | green |

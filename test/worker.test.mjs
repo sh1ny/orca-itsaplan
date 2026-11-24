@@ -259,4 +259,8 @@ test('workspace snapshot exposes only the identifiable workspace display name', 
   assert.deepEqual(await h.run('workspace.snapshot'), { ok: true, value: null });
   h.workspace({ workspaceId: 'repo::/private/repo/path', displayName: 'team.ONE' });
   assert.deepEqual(await h.run('workspace.snapshot'), { ok: true, value: 'team.ONE' });
+  h.workspace({ workspaceId: 'workspace', displayName: ' team.ONE ' });
+  assert.deepEqual(await h.run('workspace.snapshot'), { ok: true, value: ' team.ONE ' });
+  h.workspace({ workspaceId: 'workspace', displayName: '  ' });
+  assert.deepEqual(await h.run('workspace.snapshot'), { ok: true, value: null });
 });

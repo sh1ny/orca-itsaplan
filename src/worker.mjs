@@ -87,7 +87,8 @@ export default function activate(orca, requestOptions) {
 
   register('workspace.snapshot', async () => {
     const context = await orca.host.call('workspace.readContext');
-    return context?.workspaceId ? context.displayName?.trim() || null : null;
+    const name = context?.displayName;
+    return context?.workspaceId && name?.trim() ? name : null;
   });
 
   register('connection.save', (input) => writeCredential(async () => {
