@@ -4,7 +4,7 @@
   "execution": "trusted-worker",
   "id": "itsaplan",
   "name": "It's a Plan",
-  "description": "Read-only project boards from your It's a Plan instance.",
+  "description": "Browse It's a Plan boards using only read (GET) requests. Itsaplan may record sign-in activity and set up a personal workspace on first sign-in.",
   "version": "0.1.0",
   "license": "MIT",
   "repository": "https://github.com/sh1ny/orca-itsaplan",

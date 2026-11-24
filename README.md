@@ -1,6 +1,8 @@
 # It's a Plan for Orca
 
-A read-only sidebar for self-hosted [It's a Plan](https://github.com/croffasia/itsaplan). Browse accessible projects across teams, see active initiatives, and view recent issues in the tracker’s column order. No tracker writes, polling, external packages, or build required.
+Browse accessible projects, active initiatives, and recent issues from self-hosted [It's a Plan](https://github.com/croffasia/itsaplan) in Orca. No polling, external packages, or build required.
+
+The plugin sends only read (GET) requests. Itsaplan itself may record sign-in activity and, on an account’s first sign-in, set up its personal workspace.
 
 ## Install and connect
 

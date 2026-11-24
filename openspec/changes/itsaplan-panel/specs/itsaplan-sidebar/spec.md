@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Read-only HTTPS connection
-The plugin SHALL use an approved trusted worker to read one configured Itsaplan HTTPS API. The API base SHALL be an Orca setting and the API key SHALL be stored only through Orca’s secret store, bound to that exact base including any proxy path. The key SHALL NOT be returned, restored into the panel, sent on a redirect, or included in errors or logs. The worker SHALL make no tracker write requests.
+The plugin SHALL use an approved trusted worker to send only read (GET) requests to one configured Itsaplan HTTPS API. Itsaplan itself may record sign-in activity and set up a personal workspace on first sign-in. The API base SHALL be an Orca setting; the key SHALL be stored only in Orca’s secret store and bound to that base, including any proxy path. The key SHALL NOT be returned, restored into the panel, sent on a redirect, or included in errors or logs.
 
 #### Scenario: Connection from Orca
 - **WHEN** projects could not load because no key was present and a person saves a valid key for the displayed HTTPS API base
@@ -32,7 +32,7 @@ The plugin SHALL use an approved trusted worker to read one configured Itsaplan 
 - **THEN** it receives a busy result without aborting a read owned by another session
 
 ### Requirement: Project board summary
-The plugin SHALL initiate tracker reads only for an open sidebar. The sidebar SHALL distinguish teams, show permitted active initiatives, group recent issues by tracker column order, show completion of listed direct subtasks, and flag capped results. The plugin SHALL NOT poll, read individual issues, write to the tracker, create worktrees, ship tracker-specific presets, or integrate with native Orca Tasks.
+The plugin SHALL initiate tracker reads only for an open sidebar. The sidebar SHALL distinguish teams, show permitted active initiatives, group recent issues by tracker column order, show completion of listed direct subtasks, and flag capped results. The plugin SHALL NOT poll, read individual issues, create worktrees, ship tracker-specific presets, or integrate with native Orca Tasks.
 
 #### Scenario: No open sidebar
 - **WHEN** the worker starts or Orca settings or workspace focus change without an open sidebar session

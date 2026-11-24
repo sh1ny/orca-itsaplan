@@ -79,14 +79,18 @@ The owner authorized fixes for F15–F17 only: preserve exact workspace matching
 
 ### Final pre-ship disposition
 
-The OMP review of `36ee460f31` confirmed F15–F17 fixed. The owner accepted F19–F23 as follow-ups; no code changes were made after that review.
+The OMP review of `36ee460f31` confirmed F15–F17 fixed. The owner accepted F19–F23 as follow-ups; no request behavior changed after that review.
 
-- **F18 — shipment blocked:** [#1](https://github.com/sh1ny/orca-itsaplan/issues/1). Although the plugin sends only GETs, the reviewed Itsaplan build can create a workspace or team during authentication. This meets the owner's no-tracker-writes stop condition. The change was not archived and no PR was opened.
+- **F18 — initially held for the owner’s decision:** [#1](https://github.com/sh1ny/orca-itsaplan/issues/1) identified Itsaplan’s authentication side effects on GET requests. The plugin was not archived or published while the distinction was unresolved.
 - **F19 — follow-up:** [#2](https://github.com/sh1ny/orca-itsaplan/issues/2). An equivalent URL edit during credential save can leave the picker stale until Refresh.
 - **F20 — follow-up:** [#3](https://github.com/sh1ny/orca-itsaplan/issues/3). Document that the sidebar requires Orca's default isolated desktop frame mode.
 - **F21 — follow-up:** [#4](https://github.com/sh1ny/orca-itsaplan/issues/4). Document that a personal API key retains the account's authority.
 - **F22 — follow-up:** [#5](https://github.com/sh1ny/orca-itsaplan/issues/5). Align the Node version guidance with the pinned pnpm version.
 - **F23 — follow-up:** [#6](https://github.com/sh1ny/orca-itsaplan/issues/6). Record the disposition of concrete findings separately from reviewer instructions.
+
+### Owner decision on #1
+
+The owner clarified that the promise covers requests sent by the plugin: it sends only read (GET) requests. Itsaplan itself may record sign-in activity and, on an account’s first sign-in, set up its personal workspace. This is Itsaplan sign-in bookkeeping, not a write request from the plugin. F18 no longer blocks shipment and #1 stays open as a behaviour note. The owner authorized publishing after this wording change without another review round. F19–F23 remain accepted follow-ups.
 
 
 <!-- specwright-design-progress -->

@@ -16,7 +16,7 @@ People working in Orca currently have to switch to their tracker to see the proj
 - Prove HTTPS access in an approved Orca trusted worker using its real secret store, then show a sidebar with project selection, active initiatives and issues grouped by board column.
 - On open or Refresh, read the open Orca workspace and select its tracker project when the workspace is explicitly named for an exact team-qualified project reference. Otherwise offer the manual picker. Do not subscribe to focus or workspace events or save per-workspace choices.
 - Show progress inferred from listed subtasks, with no extra request per issue. Report which claims the live spike verified, and which environments it could not observe.
-- Scope: one instance per plugin installation and no Itsaplan writes, background polling, tracker-specific presets, worktree creation or native Orca Tasks integration.
+- Scope: one instance per plugin installation; no background polling, tracker-specific presets, worktree creation, or native Orca Tasks integration. The plugin sends only read (GET) requests. Itsaplan itself may record sign-in activity and, on an account’s first sign-in, set up its personal workspace.
 
 ## Capabilities
 
@@ -39,7 +39,7 @@ DECISION_MAKING: important
 
 ### S1: Read-only spike
 
-- **Choice:** A narrow sidebar and live feasibility proof, without tracker mutation or native provider integration.
+- **Choice:** A narrow sidebar and live feasibility proof, with only read (GET) requests to Itsaplan and no native provider integration. Itsaplan’s own sign-in activity and first-sign-in personal workspace setup are outside the plugin’s control.
 - **Rejected:** Reimplement the full Orca task-provider proposal before proving the plugin interface.
 - **Reversal cost:** Low; a later integration can use a different surface.
 - **Important:** Yes; review and permission limits are part of the spike.

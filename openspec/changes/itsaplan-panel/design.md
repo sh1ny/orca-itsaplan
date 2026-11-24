@@ -18,7 +18,7 @@ The normal worktree gate could not start: there was no OpenSpec root or installe
 
 ## Decisions
 
-### D1: One read-only worker, isolated HTML panel
+### D1: One GET-only tracker client, isolated HTML panel
 
 The HTML panel calls a trusted worker for project lists, selected boards, credential changes and a workspace snapshot. Untrusted strings become text nodes; the worker returns only projected rows with bounded display text. Declare `settings:own`, `secrets:own` and `workspace:read`; no write access to workspaces or terminals. The panel subscribes only to URL setting changes for invalidating credentials and boards, not to workspace or focus events. No ambient credential lookup in shipped code.
 
@@ -49,7 +49,7 @@ On panel open or Refresh, read `workspace.readContext` in the worker. An identif
 
 ## Carried constraints
 
-- Tracker operations are GET-only, with one HTTPS base, encrypted URL-bound credentials, no redirects and no credential in replies or logs. Durable home: `itsaplan-sidebar` requirement Read-only HTTPS connection.
+- The worker sends only read (GET) requests to Itsaplan, with one HTTPS base, encrypted URL-bound credentials, no redirects and no credential in replies or logs. Itsaplan itself may record sign-in activity and set up a personal workspace on first sign-in. Durable home: `itsaplan-sidebar` requirement Read-only HTTPS connection.
 - Only the panel loads data; no polling, no per-issue reads, listed-only subtask progress, no native Tasks provider, no worktree creation, and no tracker-specific presets. Durable home: `itsaplan-sidebar` requirement Project board summary.
 - Snapshot on open or Refresh only, no focus subscriptions or per-workspace preferences. Durable home: `itsaplan-sidebar` requirement Workspace project snapshot.
 - No package dependencies or build products required to install. Durable home: README development and installation instructions.
@@ -115,7 +115,7 @@ Successful key save for the current base invalidates prior connection results an
 | --- | --- |
 | URL-bound encrypted secret and disabled redirects | Credential replay against a changed URL or redirect target |
 | Deadline through the body, byte cap, and bounded latest-read lane | Hung UI and unbounded memory or request fan-out |
-| GET-only adapter and fixed errors | Unintended mutation and raw response leakage |
+| GET-only adapter and fixed errors | Plugin-issued mutation requests and raw response leakage |
 | Request generations and host setting subscription | Out-of-order connection and board completion |
 | Exact qualified ref and no focus event handling | Cross-team routing ambiguity and event-order races |
 | Cap indicator and listed-only progress | Misrepresenting partial results as the complete board |
