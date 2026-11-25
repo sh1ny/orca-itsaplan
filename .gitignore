@@ -1,0 +1,7 @@
+.orca/
+.claude/skills/specwright-*/
+.omp/agents/specwright-*.md
+openspec/schemas/specwright/
+openspec/.specwright/*
+!openspec/.specwright/VERSION
+node_modules/

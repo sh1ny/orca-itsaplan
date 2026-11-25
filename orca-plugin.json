@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stablyai/orca/main/docs/schemas/plugins/orca-plugin.v2.schema.json",
+  "manifestVersion": 2,
+  "execution": "trusted-worker",
+  "id": "itsaplan",
+  "name": "It's a Plan",
+  "description": "Browse It's a Plan boards using only read (GET) requests. Itsaplan may record sign-in activity and set up a personal workspace on first sign-in.",
+  "version": "0.1.0",
+  "license": "MIT",
+  "repository": "https://github.com/sh1ny/orca-itsaplan",
+  "engines": { "orca": ">=1.4.273" },
+  "main": "src/worker.mjs",
+  "capabilities": [
+    { "kind": "settings:own" },
+    { "kind": "secrets:own" },
+    { "kind": "workspace:read" }
+  ],
+  "contributes": {
+    "settings": [{
+      "key": "apiUrl",
+      "title": "Itsaplan HTTPS API URL",
+      "description": "Use your instance's API base, including its proxy path if any. Enter the key in the sidebar, not here.",
+      "type": "string",
+      "default": ""
+    }],
+    "panels": [{ "id": "projects", "title": "It's a Plan", "icon": "layers", "entry": "src/panel.html" }]
+  }
+}

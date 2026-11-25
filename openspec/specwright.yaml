@@ -1,0 +1,11 @@
+vcs: git
+main_branch: main
+finish: pr
+commit_granularity: group
+review:
+  cross_model: false
+  order: [omp]
+  preship: true
+pr:
+  validate: "openspec schema validate specwright"
+  merge: user
